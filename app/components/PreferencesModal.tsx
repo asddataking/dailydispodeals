@@ -88,7 +88,7 @@ export function PreferencesModal({ open, onOpenChange, email }: PreferencesModal
                 Preferences Saved!
               </h2>
               <p className="text-gray-600">
-                You'll start receiving personalized deals daily.
+                You&apos;ll start receiving personalized deals daily.
               </p>
             </div>
           </Dialog.Content>

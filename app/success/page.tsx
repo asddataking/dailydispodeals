@@ -34,7 +34,7 @@ export default function SuccessPage() {
           Payment Successful!
         </h1>
         <p className="text-gray-600 mb-6">
-          Welcome to Daily Dispo Deals. Let's set up your preferences to get you the best deals.
+          Welcome to Daily Dispo Deals. Let&apos;s set up your preferences to get you the best deals.
         </p>
         {loading && (
           <div className="text-gray-500">Loading...</div>

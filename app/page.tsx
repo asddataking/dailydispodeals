@@ -133,7 +133,7 @@ export default function Home() {
       <section className="py-20 bg-white">
         <div className="max-w-6xl mx-auto px-4">
           <h2 className="text-4xl font-bold text-lake-blue-900 mb-12">
-            Latest from Dank N' Devour
+            Latest from Dank N&apos; Devour
           </h2>
           <div className="grid md:grid-cols-3 gap-8">
             <div className="bg-gray-50 rounded-lg overflow-hidden">
