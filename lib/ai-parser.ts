@@ -1,9 +1,4 @@
-import OpenAI from 'openai'
 import { z } from 'zod'
-
-const openai = process.env.OPENAI_API_KEY ? new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-}) : null
 
 const DealSchema = z.object({
   category: z.enum(['flower', 'pre-rolls', 'vapes', 'concentrates', 'edibles', 'drinks', 'topicals', 'cbd/thca', 'accessories']),
@@ -18,25 +13,31 @@ const ParseResponseSchema = z.object({
   deals: z.array(DealSchema),
 })
 
+/**
+ * Parse deals from OCR text using Vercel AI Gateway
+ */
 export async function parseDealsFromText(
   ocrText: string,
   dispensaryName: string,
   city?: string
 ): Promise<Deal[]> {
-  if (!openai) {
-    throw new Error('OPENAI_API_KEY is not configured')
+  const aiGatewayUrl = process.env.AI_GATEWAY_URL || 'https://gateway.vercel.ai/v1/chat/completions'
+  
+  if (!process.env.AI_GATEWAY_API_KEY) {
+    throw new Error('AI_GATEWAY_API_KEY is not configured')
   }
 
-  const prompt = `Extract all cannabis deals from this dispensary flyer text. 
-Return a JSON array with objects containing: category, title, price_text, and optional confidence (0-1).
+  const systemPrompt = `You are extracting cannabis deal data from a dispensary flyer. Return a JSON array with:
+- category (flower, vapes, edibles, etc.)
+- title (short product name)
+- price_text (e.g. 2/$35, $15/gram, 30% off)
+- confidence (0–1)
+Ignore irrelevant text like store hours.`
 
-Categories must be one of: flower, pre-rolls, vapes, concentrates, edibles, drinks, topicals, cbd/thca, accessories
-Price format examples: "2/$35", "1g $15", "30% off", "$25 each", "3/$60"
-
-Dispensary: ${dispensaryName}
+  const userPrompt = `Dispensary: ${dispensaryName}
 ${city ? `City: ${city}` : ''}
 
-Text:
+Extract all deals from this flyer text:
 ${ocrText}
 
 Return only valid JSON in this format:
@@ -52,32 +53,46 @@ Return only valid JSON in this format:
 }`
 
   try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a helpful assistant that extracts structured deal information from dispensary flyer text. Always return valid JSON.',
-        },
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
-      temperature: 0.1,
-      response_format: { type: 'json_object' },
+    const response = await fetch(aiGatewayUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.AI_GATEWAY_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt,
+          },
+          {
+            role: 'user',
+            content: userPrompt,
+          },
+        ],
+        temperature: 0.1,
+        response_format: { type: 'json_object' },
+      }),
     })
 
-    const content = response.choices[0]?.message?.content
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`AI Gateway error: ${response.status} ${errorText}`)
+    }
+
+    const data = await response.json()
+    const content = data.choices?.[0]?.message?.content
+
     if (!content) {
-      throw new Error('No response from OpenAI')
+      throw new Error('No response from AI Gateway')
     }
 
     const parsed = JSON.parse(content)
     const validated = ParseResponseSchema.parse(parsed)
     
-    // Filter by confidence if provided (default threshold: 0.7)
-    return validated.deals.filter(deal => (deal.confidence ?? 1) >= 0.7)
+    // Filter deals with confidence < 0.5 (they'll be handled as summary entries)
+    return validated.deals.filter(deal => (deal.confidence ?? 1) >= 0.5)
   } catch (error) {
     console.error('AI parsing error:', error)
     throw new Error(`AI parsing failed: ${error instanceof Error ? error.message : 'Unknown error'}`)

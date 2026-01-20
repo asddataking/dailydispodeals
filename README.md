@@ -118,11 +118,17 @@ Or use the Supabase dashboard SQL editor to run the migration file.
 3. Copy your API key to `.env.local`
 4. Update the `from` email in `app/api/cron/send-daily/route.ts` to match your verified domain
 
-### 6. OpenAI Setup
+### 6. Vercel AI Gateway Setup
 
-1. Go to [OpenAI Platform](https://platform.openai.com)
-2. Create an API key
-3. Add it to `.env.local`
+1. Go to your [Vercel Dashboard](https://vercel.com/dashboard)
+2. Navigate to your project → Settings → AI Gateway
+3. Enable AI Gateway and configure it to proxy OpenAI requests
+4. Get your AI Gateway API key and URL from the dashboard
+5. Add to `.env.local`:
+   - `AI_GATEWAY_URL` (optional, defaults to Vercel's gateway endpoint if not set)
+   - `AI_GATEWAY_API_KEY` (required, your gateway API key)
+
+**Note:** Vercel AI Gateway provides caching, rate limiting, and cost optimization for AI requests. It proxies requests to OpenAI or other providers configured in your gateway settings.
 
 ### 7. Run Development Server
 

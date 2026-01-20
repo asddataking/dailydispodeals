@@ -89,6 +89,7 @@ export async function GET(request: NextRequest) {
             ocr_text: ocrData.text,
             dispensary_name: dispensary.name,
             city: dispensary.city,
+            source_url: dispensary.url,
           }),
         })
 
