@@ -30,7 +30,7 @@ export const metadata: Metadata = {
   ],
   openGraph: {
     title: "Daily Dispo Deals - Best Cannabis Deals in Michigan",
-    description: "Get personalized daily cannabis deals delivered to your inbox. Zero searching required.",
+    description: "Zero searching. Better weed deals. We find the best dispensary deals so you don't have to.",
     type: "website",
     locale: "en_US",
     url: process.env.APP_URL || "https://dailydispodeals.com",
@@ -47,7 +47,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Daily Dispo Deals - Best Cannabis Deals in Michigan",
-    description: "Get personalized daily cannabis deals delivered to your inbox. Zero searching required.",
+    description: "Zero searching. Better weed deals. We find the best dispensary deals so you don't have to.",
     images: ["/lake.jpg"],
   },
   alternates: {
