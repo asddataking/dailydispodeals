@@ -9,10 +9,6 @@ const nextConfig = {
       bodySizeLimit: '2mb',
     },
   },
-  // Generate static pages for city-based SEO
-  async generateStaticParams() {
-    return []
-  },
 }
 
 module.exports = nextConfig
