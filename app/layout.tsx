@@ -33,11 +33,22 @@ export const metadata: Metadata = {
     description: "Get personalized daily cannabis deals delivered to your inbox. Zero searching required.",
     type: "website",
     locale: "en_US",
+    url: process.env.APP_URL || "https://dailydispodeals.com",
+    siteName: "Daily Dispo Deals",
+    images: [
+      {
+        url: "/lake.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Daily Dispo Deals - Best Cannabis Deals in Michigan",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Daily Dispo Deals - Best Cannabis Deals in Michigan",
     description: "Get personalized daily cannabis deals delivered to your inbox. Zero searching required.",
+    images: ["/lake.jpg"],
   },
   alternates: {
     canonical: process.env.APP_URL || "https://dailydispodeals.com",
