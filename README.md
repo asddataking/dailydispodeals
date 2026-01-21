@@ -10,6 +10,7 @@ A Next.js 14 application for delivering personalized daily cannabis deals via em
 - Deal ingestion pipeline with OCR and AI parsing
 - **Dispensary auto-discovery** - Automatically finds dispensaries based on user zip codes
 - **Deal quality assurance** - Confidence filtering, duplicate detection, and manual review queue
+- **Supabase Edge Functions** - Fast edge-optimized API routes for better performance
 - Responsive landing page with modern UI
 
 ## Tech Stack
@@ -51,6 +52,10 @@ Create a `.env.local` file in the root directory:
 SUPABASE_URL=your_supabase_url
 SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+
+# Public Supabase vars (for client-side edge function calls)
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 
 # Stripe
 STRIPE_SECRET_KEY=your_stripe_secret_key
@@ -169,7 +174,43 @@ openssl rand -hex 32
 
 Copy the generated strings to your `.env.local` file.
 
-### 8. Run Development Server
+### 8. Deploy Supabase Edge Functions (Optional but Recommended)
+
+Edge functions provide faster response times by running at the edge. Deploy them using Supabase CLI:
+
+```bash
+# Install Supabase CLI (if not already installed)
+npm install -g supabase
+
+# Login to Supabase
+supabase login
+
+# Link to your project
+supabase link --project-ref rcmutihmkkievrxddkrj
+
+# Deploy edge functions
+supabase functions deploy get-deals
+supabase functions deploy get-brands
+supabase functions deploy save-preferences
+```
+
+**Or use Supabase MCP** to deploy:
+- Use the `mcp_supabase_deploy_edge_function` tool for each function
+
+**Edge Functions Created:**
+- `get-deals` - Fast deal querying with user preferences
+- `get-brands` - Fast brand listing
+- `save-preferences` - Fast preference saving
+
+**Important:** Edge functions require environment variables set in Supabase dashboard:
+1. Go to your Supabase project → Edge Functions → Settings → Secrets
+2. Add these secrets:
+   - `SUPABASE_URL` - Your Supabase project URL
+   - `SUPABASE_SERVICE_ROLE_KEY` - Your service role key (same as backend)
+
+**Note:** The frontend automatically uses edge functions when available, with automatic fallback to Next.js API routes if edge functions fail.
+
+### 9. Run Development Server
 
 ```bash
 npm run dev

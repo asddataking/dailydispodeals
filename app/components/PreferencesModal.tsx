@@ -31,18 +31,33 @@ export function PreferencesModal({ open, onOpenChange, email }: PreferencesModal
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
 
-  // Fetch available brands on mount
+  // Fetch available brands on mount (using edge function for speed)
   useEffect(() => {
-    fetch('/api/brands')
-      .then(res => res.json())
-      .then(data => {
+    // Try edge function first, fallback to API route
+    const fetchBrands = async () => {
+      try {
+        // Use edge function if available
+        const { callEdgeFunction } = await import('@/lib/supabase/client')
+        const data = await callEdgeFunction('get-brands', {})
         if (data.brands) {
           setAvailableBrands(data.brands)
         }
-      })
-      .catch(err => {
-        console.error('Failed to fetch brands:', err)
-      })
+      } catch (err) {
+        // Fallback to API route
+        console.warn('Edge function failed, using API route:', err)
+        fetch('/api/brands')
+          .then(res => res.json())
+          .then(data => {
+            if (data.brands) {
+              setAvailableBrands(data.brands)
+            }
+          })
+          .catch(error => {
+            console.error('Failed to fetch brands:', error)
+          })
+      }
+    }
+    fetchBrands()
   }, [])
 
   const toggleCategory = (category: string) => {
@@ -73,21 +88,38 @@ export function PreferencesModal({ open, onOpenChange, email }: PreferencesModal
     setError(null)
 
     try {
-      const response = await fetch('/api/preferences', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      // Try edge function first for speed, fallback to API route
+      let data: any
+      try {
+        const { callEdgeFunction } = await import('@/lib/supabase/client')
+        data = await callEdgeFunction('save-preferences', {
           email,
           categories: selectedCategories,
           brands: selectedBrands.length > 0 ? selectedBrands : undefined,
           zip: zip || undefined,
           radius: radius || undefined,
-        }),
-      })
+        })
+      } catch (edgeError) {
+        // Fallback to API route
+        console.warn('Edge function failed, using API route:', edgeError)
+        const response = await fetch('/api/preferences', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email,
+            categories: selectedCategories,
+            brands: selectedBrands.length > 0 ? selectedBrands : undefined,
+            zip: zip || undefined,
+            radius: radius || undefined,
+          }),
+        })
+        data = await response.json()
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to save preferences')
+        }
+      }
 
-      const data = await response.json()
-
-      if (!response.ok) {
+      if (!data.ok) {
         throw new Error(data.error || 'Failed to save preferences')
       }
 
