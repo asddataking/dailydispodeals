@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
         id,
         user_id,
         users!inner(email),
-        preferences(categories, zip, radius)
+        preferences(categories, brands, zip, radius)
       `)
       .eq('status', 'active')
       .gt('current_period_end', new Date().toISOString())
@@ -82,12 +82,40 @@ export async function GET(request: NextRequest) {
         continue
       }
 
-      const { data: deals } = await supabaseAdmin
+      // Build query with brand join
+      let dealsQuery = supabaseAdmin
         .from('deals')
-        .select('*')
+        .select(`
+          *,
+          brands (
+            id,
+            name
+          )
+        `)
         .eq('date', today)
-        .overlaps('category', preferences.categories)
+        .in('category', preferences.categories)
+        .eq('needs_review', false) // Only approved deals
         .limit(10)
+
+      // If user has brand preferences, filter by brands
+      if (preferences.brands && preferences.brands.length > 0) {
+        // Get brand IDs for user's preferred brands
+        const { data: brandIds } = await supabaseAdmin
+          .from('brands')
+          .select('id')
+          .in('name', preferences.brands)
+
+        if (brandIds && brandIds.length > 0) {
+          const ids = brandIds.map(b => b.id)
+          dealsQuery = dealsQuery.in('brand_id', ids)
+        } else {
+          // User has brand preferences but no matching brands found
+          skipped++
+          continue
+        }
+      }
+
+      const { data: deals } = await dealsQuery
 
       if (!deals || deals.length === 0) {
         skipped++

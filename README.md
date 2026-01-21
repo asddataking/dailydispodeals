@@ -8,6 +8,8 @@ A Next.js 14 application for delivering personalized daily cannabis deals via em
 - Personalized deal matching based on user preferences
 - Automated daily email delivery
 - Deal ingestion pipeline with OCR and AI parsing
+- **Dispensary auto-discovery** - Automatically finds dispensaries based on user zip codes
+- **Deal quality assurance** - Confidence filtering, duplicate detection, and manual review queue
 - Responsive landing page with modern UI
 
 ## Tech Stack
@@ -20,7 +22,8 @@ A Next.js 14 application for delivering personalized daily cannabis deals via em
 - **Payments**: Stripe
 - **Email**: Resend
 - **OCR**: OpenAI Vision API
-- **AI Parsing**: OpenAI GPT-4.1-mini
+- **AI Parsing**: OpenAI GPT-4o-mini or Google Gemini 1.5 Flash (via Vercel AI Gateway)
+- **Geocoding**: Google Maps API (for dispensary discovery)
 
 ## Prerequisites
 
@@ -28,7 +31,8 @@ A Next.js 14 application for delivering personalized daily cannabis deals via em
 - Supabase account
 - Stripe account
 - Resend account
-- OpenAI API key
+- OpenAI API key (or Google Gemini API key)
+- Google Maps API key (for geocoding and dispensary discovery)
 
 ## Setup Instructions
 
@@ -70,6 +74,14 @@ NODE_ENV=development
 
 # For ingestion pipeline
 OPENAI_API_KEY=your_openai_api_key
+
+# Geocoding (for dispensary discovery)
+GOOGLE_MAPS_API_KEY=your_google_maps_api_key
+
+# Deal Quality Settings (optional)
+DEAL_CONFIDENCE_THRESHOLD=0.7  # Min confidence to auto-approve
+DEAL_REVIEW_THRESHOLD=0.5      # Confidence below this requires review
+ADMIN_EMAIL=admin@yourdomain.com  # For review notifications
 ```
 
 ### 3. Supabase Setup
@@ -79,15 +91,17 @@ OPENAI_API_KEY=your_openai_api_key
 2. Create a new project
 3. Copy your project URL and anon key
 
-#### Run Migration
-Use Supabase MCP or the Supabase CLI to apply the migration:
+#### Run Migrations
+Use Supabase MCP or the Supabase CLI to apply the migrations:
 
 ```bash
 # Using Supabase MCP
-# Apply migration from supabase/migrations/001_initial_schema.sql
+# Apply migrations in order:
+# 1. supabase/migrations/001_initial_schema.sql
+# 2. supabase/migrations/002_dispensary_quality.sql
 ```
 
-Or use the Supabase dashboard SQL editor to run the migration file.
+Or use the Supabase dashboard SQL editor to run the migration files in order.
 
 #### Create Storage Bucket
 1. Go to Storage in Supabase dashboard
@@ -212,7 +226,15 @@ curl -X GET "https://yourdomain.com/api/cron/ingest-daily" \
 ### Ingestion Routes
 - `POST /api/ingest/fetch` - Download and store flyer
 - `POST /api/ingest/ocr` - Extract text from flyer
-- `POST /api/ingest/parse` - Parse deals from OCR text
+- `POST /api/ingest/parse` - Parse deals from OCR text (includes quality checks)
+
+### Admin Routes
+- `GET /api/admin/dispensaries` - List all dispensaries with stats
+- `POST /api/admin/dispensaries` - Add new dispensary
+- `PUT /api/admin/dispensaries` - Update dispensary
+- `DELETE /api/admin/dispensaries?id=...` - Deactivate dispensary
+- `GET /api/admin/deals/review` - List pending deal reviews
+- `POST /api/admin/deals/review` - Approve/reject/fix a deal review
 
 ## Database Schema
 
@@ -221,10 +243,12 @@ See `supabase/migrations/001_initial_schema.sql` for the complete schema.
 ### Tables
 - `users` - User accounts
 - `subscriptions` - Stripe subscription records
-- `preferences` - User deal preferences
-- `deals` - Deal listings
+- `preferences` - User deal preferences (triggers dispensary discovery)
+- `deals` - Deal listings (with quality metadata: confidence, needs_review, deal_hash)
 - `email_logs` - Email delivery logs
 - `deal_flyers` - Flyer tracking
+- `dispensaries` - Dispensary configurations and locations (auto-discovered)
+- `deal_reviews` - Manual review queue for flagged deals
 
 ## Project Structure
 
@@ -243,8 +267,11 @@ See `supabase/migrations/001_initial_schema.sql` for the complete schema.
 │   ├── stripe.ts        # Stripe client
 │   ├── resend.ts        # Resend client
 │   ├── ocr.ts           # OCR utilities
-│   ├── ai-parser.ts     # AI parsing
-│   └── file-utils.ts    # File utilities
+│   ├── ai-parser.ts     # AI parsing (OpenAI/Gemini)
+│   ├── file-utils.ts    # File utilities
+│   ├── geocoding.ts     # Geocoding utilities
+│   ├── dispensary-discovery.ts  # Auto-discovery logic
+│   └── deal-quality.ts  # Quality checks and validation
 ├── supabase/
 │   └── migrations/      # Database migrations
 └── vercel.json          # Vercel configuration
@@ -284,6 +311,48 @@ curl -X POST "http://localhost:3000/api/dev/seed-deals" \
 - Verify OpenAI API key is valid
 - Check API quota/limits
 - Ensure file format is supported (PNG, JPG, PDF)
+
+### Dispensary Discovery Not Working
+- Verify `GOOGLE_MAPS_API_KEY` is set and valid
+- Check that users have zip codes and radius in preferences
+- Review dispensaries table to see discovered dispensaries
+
+### Deal Quality Issues
+- Check `deal_reviews` table for flagged deals
+- Review confidence scores in `deals` table
+- Adjust `DEAL_CONFIDENCE_THRESHOLD` and `DEAL_REVIEW_THRESHOLD` if needed
+
+## Dispensary Auto-Discovery
+
+The system automatically discovers and tracks dispensaries based on user locations:
+
+1. **User signs up** with zip code + radius preference
+2. **System discovers** dispensaries near that zip code
+3. **Dispensaries added** to database with locations and flyer URLs
+4. **Daily cron** processes only dispensaries with active users nearby
+5. **As users grow**, dispensary list grows organically
+
+Dispensaries are tracked with:
+- Location (lat/lng, zip, city)
+- Flyer URL for daily ingestion
+- Success rate tracking
+- Auto-disable if reliability drops
+
+## Deal Quality Assurance
+
+Multiple layers ensure deal quality:
+
+1. **Confidence Filtering** - AI returns confidence scores (0-1)
+2. **Duplicate Detection** - Hash-based deduplication prevents duplicates
+3. **Price Validation** - Flags unusually high/low prices
+4. **Category Validation** - Ensures category matches product title
+5. **Manual Review Queue** - Suspicious deals flagged for admin review
+
+**Quality Thresholds:**
+- `DEAL_CONFIDENCE_THRESHOLD` (default: 0.7) - Auto-approve above this
+- `DEAL_REVIEW_THRESHOLD` (default: 0.5) - Flag for review below this
+
+Deals below the review threshold are automatically flagged and added to the review queue for manual approval.
 
 ## License
 

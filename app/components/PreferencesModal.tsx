@@ -23,17 +23,41 @@ const CATEGORIES = [
 
 export function PreferencesModal({ open, onOpenChange, email }: PreferencesModalProps) {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
+  const [selectedBrands, setSelectedBrands] = useState<string[]>([])
+  const [availableBrands, setAvailableBrands] = useState<Array<{ id: string; name: string }>>([])
   const [zip, setZip] = useState('')
   const [radius, setRadius] = useState<5 | 10 | 25 | undefined>(undefined)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
 
+  // Fetch available brands on mount
+  useEffect(() => {
+    fetch('/api/brands')
+      .then(res => res.json())
+      .then(data => {
+        if (data.brands) {
+          setAvailableBrands(data.brands)
+        }
+      })
+      .catch(err => {
+        console.error('Failed to fetch brands:', err)
+      })
+  }, [])
+
   const toggleCategory = (category: string) => {
     setSelectedCategories(prev =>
       prev.includes(category)
         ? prev.filter(c => c !== category)
         : [...prev, category]
+    )
+  }
+
+  const toggleBrand = (brandName: string) => {
+    setSelectedBrands(prev =>
+      prev.includes(brandName)
+        ? prev.filter(b => b !== brandName)
+        : [...prev, brandName]
     )
   }
 
@@ -55,6 +79,7 @@ export function PreferencesModal({ open, onOpenChange, email }: PreferencesModal
         body: JSON.stringify({
           email,
           categories: selectedCategories,
+          brands: selectedBrands.length > 0 ? selectedBrands : undefined,
           zip: zip || undefined,
           radius: radius || undefined,
         }),
@@ -127,6 +152,36 @@ export function PreferencesModal({ open, onOpenChange, email }: PreferencesModal
                   </label>
                 ))}
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Preferred Brands (optional - select brands you like)
+              </label>
+              {availableBrands.length > 0 ? (
+                <div className="max-h-48 overflow-y-auto border rounded-lg p-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    {availableBrands.map(brand => (
+                      <label
+                        key={brand.id}
+                        className="flex items-center p-2 border rounded cursor-pointer hover:bg-gray-50"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedBrands.includes(brand.name)}
+                          onChange={() => toggleBrand(brand.name)}
+                          className="mr-2"
+                        />
+                        <span className="text-sm">{brand.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 mt-2 p-2 border rounded-lg bg-gray-50">
+                  No brands available yet. Brands will appear as deals are processed.
+                </p>
+              )}
             </div>
 
             <div>

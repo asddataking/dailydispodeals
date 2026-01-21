@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
     // Load user preferences
     const { data: preferences } = await supabaseAdmin
       .from('preferences')
-      .select('categories, zip, radius')
+      .select('categories, brands, zip, radius')
       .eq('user_id', user.id)
       .single()
 
@@ -67,14 +67,37 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ deals: [] })
     }
 
-    // Query deals matching date and categories
-    // Note: deals.category is a single text field, preferences.categories is an array
-    // We need to check if deals.category is IN preferences.categories
+    // Query deals matching date and categories, with brand join
     let query = supabaseAdmin
       .from('deals')
-      .select('*')
+      .select(`
+        *,
+        brands (
+          id,
+          name
+        )
+      `)
       .eq('date', date)
       .in('category', preferences.categories)
+      .eq('needs_review', false) // Only show approved deals
+
+    // If user has brand preferences, filter by brands
+    if (preferences.brands && preferences.brands.length > 0) {
+      // Get brand IDs for user's preferred brands
+      const { data: brandIds } = await supabaseAdmin
+        .from('brands')
+        .select('id')
+        .in('name', preferences.brands)
+
+      if (brandIds && brandIds.length > 0) {
+        const ids = brandIds.map(b => b.id)
+        query = query.in('brand_id', ids)
+      } else {
+        // User has brand preferences but no matching brands found
+        // Return empty (or could return all deals - depends on UX preference)
+        return NextResponse.json({ deals: [] })
+      }
+    }
 
     // If zip provided, filter by location (simplified - would need geocoding for real implementation)
     // For MVP, we'll return all matching deals regardless of zip/radius

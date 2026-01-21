@@ -1,4 +1,4 @@
-import { generateText } from 'ai'
+import { generateObject } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { z } from 'zod'
@@ -6,6 +6,8 @@ import { z } from 'zod'
 const DealSchema = z.object({
   category: z.enum(['flower', 'pre-rolls', 'vapes', 'concentrates', 'edibles', 'drinks', 'topicals', 'cbd/thca', 'accessories']),
   title: z.string().min(1),
+  brand: z.string().optional(), // Brand/producer name (e.g., "STIIIZY", "Element", "GLTino")
+  product_name: z.string().optional(), // Product name without brand (e.g., "1g carts", "Live Resin")
   price_text: z.string().min(1),
   confidence: z.number().min(0).max(1).optional(),
 })
@@ -54,9 +56,12 @@ export async function parseDealsFromText(
 
   const systemPrompt = `You are extracting cannabis deal data from a dispensary flyer. Return a JSON array with:
 - category (flower, vapes, edibles, etc.)
-- title (short product name)
+- title (full product title as shown)
+- brand (brand/producer name if present, e.g., "STIIIZY", "Element", "GLTino" - extract from title)
+- product_name (product name without brand, e.g., "1g carts", "Live Resin" - extract from title if brand present)
 - price_text (e.g. 2/$35, $15/gram, 30% off)
 - confidence (0–1)
+If brand is not clearly identifiable, leave brand and product_name empty and put full title in title field.
 Ignore irrelevant text like store hours.`
 
   const userPrompt = `Dispensary: ${dispensaryName}
@@ -71,6 +76,8 @@ Return only valid JSON in this format:
     {
       "category": "vapes",
       "title": "STIIIZY 1g carts",
+      "brand": "STIIIZY",
+      "product_name": "1g carts",
       "price_text": "2/$35",
       "confidence": 0.87
     }
@@ -78,7 +85,7 @@ Return only valid JSON in this format:
 }`
 
   try {
-    const result = await generateText({
+    const result = await generateObject({
       model,
       system: systemPrompt,
       prompt: userPrompt,
@@ -86,7 +93,7 @@ Return only valid JSON in this format:
       schema: ParseResponseSchema,
     })
 
-    // With structured outputs, the result.object contains the parsed and validated data
+    // With generateObject, the result.object contains the parsed and validated data
     const parsedData = result.object as { deals: Deal[] }
     
     // Filter deals with confidence < 0.5 (they'll be handled as summary entries)

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { parseDealsFromText } from '@/lib/ai-parser'
+import { calculateDealHash, validateDealQuality, flagForReview } from '@/lib/deal-quality'
+import { findOrCreateBrand, extractBrandFromTitle } from '@/lib/brand-extraction'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -85,32 +87,110 @@ export async function POST(request: NextRequest) {
     const highConfidenceDeals = deals.filter(deal => (deal.confidence ?? 1) >= 0.5)
     const lowConfidenceDeals = deals.filter(deal => (deal.confidence ?? 1) < 0.5)
 
-    // Insert high confidence deals
+    // Process high confidence deals with quality checks
     let dealsInserted = 0
+    let dealsFlaggedForReview = 0
+    
     if (highConfidenceDeals.length > 0) {
-      const dealsToInsert = highConfidenceDeals.map(deal => ({
-        dispensary_name: validated.dispensary_name,
-        city: validated.city || null,
-        date: today,
-        category: deal.category,
-        title: deal.title,
-        price_text: deal.price_text,
-        source_url: sourceUrl, // Always include source_url for verification
-      }))
-
-      const { error: insertError } = await supabaseAdmin
-        .from('deals')
-        .insert(dealsToInsert)
-
-      if (insertError) {
-        console.error('Deals insert error:', insertError)
-        return NextResponse.json(
-          { error: 'Failed to insert deals' },
-          { status: 500 }
-        )
+      const dealsToInsert: Array<{ deal: any; reviewReason?: string }> = []
+      
+      for (const deal of highConfidenceDeals) {
+        const dealWithMetadata = {
+          ...deal,
+          dispensary_name: validated.dispensary_name,
+          date: today,
+          city: validated.city,
+        }
+        
+        // Calculate deal hash for duplicate detection
+        const dealHash = calculateDealHash(dealWithMetadata)
+        
+        // Validate deal quality
+        const qualityCheck = await validateDealQuality(dealWithMetadata)
+        
+        if (!qualityCheck.isValid || qualityCheck.duplicateFound) {
+          // Skip duplicate deals
+          console.log(`Skipping duplicate deal: ${deal.title}`)
+          continue
+        }
+        
+        // Extract brand from deal (AI may have extracted it, or we use fallback)
+        let brandId: string | null = null
+        let productName: string | null = null
+        
+        if (deal.brand) {
+          // AI extracted brand, use it
+          brandId = await findOrCreateBrand(deal.brand)
+          productName = deal.product_name || deal.title.replace(deal.brand, '').trim()
+        } else {
+          // Fallback: try to extract brand from title
+          const extracted = extractBrandFromTitle(deal.title)
+          if (extracted.brand) {
+            brandId = await findOrCreateBrand(extracted.brand)
+            productName = extracted.productName
+          } else {
+            // No brand found, keep full title
+            productName = null
+          }
+        }
+        
+        // Prepare deal for insertion
+        const dealToInsert: any = {
+          dispensary_name: validated.dispensary_name,
+          city: validated.city || null,
+          date: today,
+          category: deal.category,
+          title: deal.title,
+          product_name: productName,
+          price_text: deal.price_text,
+          source_url: sourceUrl,
+          brand_id: brandId,
+          confidence: deal.confidence ?? 1.0,
+          deal_hash: dealHash,
+          needs_review: qualityCheck.needsReview,
+        }
+        
+        dealsToInsert.push({ 
+          deal: dealToInsert, 
+          reviewReason: qualityCheck.reviewReason 
+        })
+        
+        // Track if this deal needs review
+        if (qualityCheck.needsReview && qualityCheck.reviewReason) {
+          dealsFlaggedForReview++
+        }
       }
 
-      dealsInserted = dealsToInsert.length
+      if (dealsToInsert.length > 0) {
+        const dealsForInsertion = dealsToInsert.map(item => item.deal)
+        
+        const { data: insertedDeals, error: insertError } = await supabaseAdmin
+          .from('deals')
+          .insert(dealsForInsertion)
+          .select('id, needs_review')
+
+        if (insertError) {
+          console.error('Deals insert error:', insertError)
+          return NextResponse.json(
+            { error: 'Failed to insert deals' },
+            { status: 500 }
+          )
+        }
+
+        dealsInserted = dealsToInsert.length
+        
+        // Flag deals for review that need it
+        if (insertedDeals) {
+          for (let i = 0; i < insertedDeals.length; i++) {
+            const insertedDeal = insertedDeals[i]
+            const dealData = dealsToInsert[i]
+            
+            if (insertedDeal.needs_review && dealData.reviewReason) {
+              await flagForReview(insertedDeal.id, dealData.reviewReason)
+            }
+          }
+        }
+      }
     }
 
     // For low confidence deals, create a summary entry
@@ -144,8 +224,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       deals_inserted: dealsInserted,
-      deals: highConfidenceDeals,
+      deals: highConfidenceDeals.slice(0, dealsInserted), // Only return inserted deals
       low_confidence_handled: lowConfidenceDeals.length > 0,
+      flagged_for_review: dealsFlaggedForReview,
     })
   } catch (error) {
     if (error instanceof z.ZodError) {

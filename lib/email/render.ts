@@ -2,24 +2,33 @@ export function renderDailyDealsEmail(
   deals: Array<{
     dispensary_name: string
     title: string
+    product_name?: string | null
     price_text: string
     city: string | null
     source_url: string | null
+    brands?: { name: string } | null
   }>,
   userEmail: string,
   appUrl: string
 ): { subject: string; html: string } {
   const subject = "Today's Dispo Deals (Your Picks)"
   
-  const dealCards = deals.map(deal => `
+  const dealCards = deals.map(deal => {
+    const brandName = deal.brands?.name
+    const displayTitle = brandName && deal.product_name 
+      ? `${brandName} ${deal.product_name}` 
+      : deal.title
+    
+    return `
     <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 16px; background: #ffffff;">
       <h3 style="margin: 0 0 8px 0; color: #0a2540; font-size: 18px;">${escapeHtml(deal.dispensary_name)}</h3>
-      <p style="margin: 0 0 8px 0; color: #374151; font-size: 16px; font-weight: 600;">${escapeHtml(deal.title)}</p>
+      ${brandName ? `<p style="margin: 0 0 4px 0; color: #136694; font-size: 14px; font-weight: 600; text-transform: uppercase;">${escapeHtml(brandName)}</p>` : ''}
+      <p style="margin: 0 0 8px 0; color: #374151; font-size: 16px; font-weight: 600;">${escapeHtml(displayTitle)}</p>
       <p style="margin: 0 0 8px 0; color: #059669; font-size: 18px; font-weight: 700;">${escapeHtml(deal.price_text)}</p>
       ${deal.city ? `<p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">📍 ${escapeHtml(deal.city)}</p>` : ''}
       ${deal.source_url ? `<a href="${escapeHtml(deal.source_url)}" style="color: #136694; text-decoration: none; font-size: 14px;">Verify Deal →</a>` : ''}
     </div>
-  `).join('')
+  `}).join('')
 
   const html = `
     <!DOCTYPE html>
