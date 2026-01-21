@@ -57,7 +57,7 @@ STRIPE_YEARLY_PRICE_ID=your_yearly_price_id
 # Resend
 RESEND_API_KEY=your_resend_api_key
 
-# Cron
+# Cron Secrets (generate random strings - see below)
 CRON_SECRET=your_random_cron_secret
 INGESTION_CRON_SECRET=your_random_ingestion_cron_secret
 
@@ -130,7 +130,27 @@ Or use the Supabase dashboard SQL editor to run the migration file.
 
 **Note:** Vercel AI Gateway provides caching, rate limiting, and cost optimization for AI requests. It proxies requests to OpenAI or other providers configured in your gateway settings.
 
-### 7. Run Development Server
+### 7. Generate Cron Secrets
+
+These secrets protect your cron endpoints. Generate random strings using one of these methods:
+
+**Option 1: Using Node.js (recommended)**
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+**Option 2: Using OpenSSL**
+```bash
+openssl rand -hex 32
+```
+
+**Option 3: Online Generator**
+- Use a secure random string generator like [randomkeygen.com](https://randomkeygen.com/) (use the "CodeIgniter Encryption Keys" section)
+- Generate two different strings for `CRON_SECRET` and `INGESTION_CRON_SECRET`
+
+Copy the generated strings to your `.env.local` file.
+
+### 8. Run Development Server
 
 ```bash
 npm run dev
@@ -144,12 +164,16 @@ Visit [http://localhost:3000](http://localhost:3000)
 
 1. Push your code to GitHub
 2. Import project in [Vercel](https://vercel.com)
-3. Add all environment variables
-4. Deploy
-
-The cron jobs are configured in `vercel.json`:
-- Ingestion: 8 AM daily
-- Email: 9 AM daily
+3. Add all environment variables (including your generated `CRON_SECRET` and `INGESTION_CRON_SECRET`)
+4. Configure Cron Jobs:
+   - Go to your project → Settings → Cron Jobs
+   - The cron jobs are already configured in `vercel.json`:
+     - Ingestion: 8 AM daily (`/api/cron/ingest-daily`)
+     - Email: 9 AM daily (`/api/cron/send-daily`)
+   - **Important:** When configuring cron jobs in Vercel, add these headers:
+     - For `/api/cron/send-daily`: `Authorization: Bearer YOUR_CRON_SECRET`
+     - For `/api/cron/ingest-daily`: `Authorization: Bearer YOUR_INGESTION_CRON_SECRET`
+5. Deploy
 
 ### Manual Cron Testing
 
