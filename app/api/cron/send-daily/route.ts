@@ -3,6 +3,11 @@ import { headers } from 'next/headers'
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { resend } from '@/lib/resend'
 import { renderDailyDealsEmail } from '@/lib/email/render'
+import {
+  getDispensariesInUserZones,
+  addDistancesToDeals,
+  rankDealsWithDistance,
+} from '@/lib/zone-deals'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -82,6 +87,18 @@ export async function GET(request: NextRequest) {
         continue
       }
 
+      // Filter deals by zone: only show deals from dispensaries in user's zones
+      const dispensariesInZones = await getDispensariesInUserZones(user.email)
+      if (dispensariesInZones.length === 0) {
+        skipped++
+        continue
+      }
+
+      // Filter out stale deals (older than 2 days)
+      const twoDaysAgo = new Date(today)
+      twoDaysAgo.setDate(twoDaysAgo.getDate() - 2)
+      const twoDaysAgoStr = twoDaysAgo.toISOString().split('T')[0]
+
       // Build query with brand join
       let dealsQuery = supabaseAdmin
         .from('deals')
@@ -93,7 +110,9 @@ export async function GET(request: NextRequest) {
           )
         `)
         .eq('date', today)
+        .gte('date', twoDaysAgoStr) // Only show deals from last 2 days
         .in('category', preferences.categories)
+        .in('dispensary_name', dispensariesInZones)
         .eq('needs_review', false) // Only approved deals
         .limit(10)
 
@@ -122,10 +141,19 @@ export async function GET(request: NextRequest) {
         continue
       }
 
+      // Add distances for ranking (if user has ZIP)
+      const dealsWithDistances = await addDistancesToDeals(
+        deals,
+        preferences.zip || null
+      )
+
+      // Rank deals: group duplicates and rank by distance
+      const rankedDeals = rankDealsWithDistance(dealsWithDistances)
+
       // Render and send email
       try {
         const { subject, html } = renderDailyDealsEmail(
-          deals,
+          rankedDeals,
           user.email,
           process.env.APP_URL || 'https://dailydispodeals.com'
         )

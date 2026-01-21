@@ -143,96 +143,106 @@ export async function GET(request: NextRequest) {
       try {
         let dealsFromThisDispensary = 0
 
-        // Try flyer ingestion first (if available)
-        if (dispensary.flyer_url) {
-          try {
-            // Step 1: Fetch flyer
-            const fetchResponse = await fetch(`${process.env.APP_URL}/api/ingest/fetch`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                dispensary_name: dispensary.name,
-                source_url: dispensary.flyer_url,
-              }),
-            })
+        // Try flyer and website extraction in parallel for faster processing
+        const [flyerResult, websiteResult] = await Promise.allSettled([
+          // Flyer ingestion (if available)
+          dispensary.flyer_url ? (async () => {
+            try {
+              // Step 1: Fetch flyer
+              const fetchResponse = await fetch(`${process.env.APP_URL}/api/ingest/fetch`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  dispensary_name: dispensary.name,
+                  source_url: dispensary.flyer_url,
+                }),
+              })
 
-            if (fetchResponse.ok) {
+              if (!fetchResponse.ok) return 0
               const fetchData = await fetchResponse.json()
-              if (!fetchData.skipped) {
-                // Step 2: OCR
-                const ocrResponse = await fetch(`${process.env.APP_URL}/api/ingest/ocr`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    file_path: fetchData.file_path,
-                  }),
-                })
+              if (fetchData.skipped) return 0
 
-                if (ocrResponse.ok) {
-                  const ocrData = await ocrResponse.json()
+              // Step 2: OCR
+              const ocrResponse = await fetch(`${process.env.APP_URL}/api/ingest/ocr`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  file_path: fetchData.file_path,
+                }),
+              })
 
-                  // Step 3: Parse
-                  const parseResponse = await fetch(`${process.env.APP_URL}/api/ingest/parse`, {
+              if (!ocrResponse.ok) return 0
+              const ocrData = await ocrResponse.json()
+
+              // Step 3: Parse
+              const parseResponse = await fetch(`${process.env.APP_URL}/api/ingest/parse`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  ocr_text: ocrData.text,
+                  dispensary_name: dispensary.name,
+                  city: dispensary.city,
+                  source_url: dispensary.flyer_url,
+                }),
+              })
+
+              if (!parseResponse.ok) return 0
+              const parseData = await parseResponse.json()
+              return parseData.deals_inserted || 0
+            } catch (error) {
+              console.warn(`Flyer ingestion failed for ${dispensary.name}:`, error)
+              return 0
+            }
+          })() : Promise.resolve(0),
+
+          // Website extraction (if available)
+          dispensary.website ? (async () => {
+            try {
+              // Try common deals page paths
+              const possibleUrls = [
+                dispensary.website.endsWith('/') ? dispensary.website + 'deals' : dispensary.website + '/deals',
+                dispensary.website.endsWith('/') ? dispensary.website + 'specials' : dispensary.website + '/specials',
+                dispensary.website.endsWith('/') ? dispensary.website + 'menu' : dispensary.website + '/menu',
+                dispensary.website, // Fallback to homepage
+              ]
+
+              for (const url of possibleUrls) {
+                try {
+                  const websiteResponse = await fetch(`${process.env.APP_URL}/api/ingest/website-deals`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                      ocr_text: ocrData.text,
                       dispensary_name: dispensary.name,
+                      website_url: url,
                       city: dispensary.city,
-                      source_url: dispensary.flyer_url,
                     }),
                   })
 
-                  if (parseResponse.ok) {
-                    const parseData = await parseResponse.json()
-                    dealsFromThisDispensary += parseData.deals_inserted || 0
+                  if (websiteResponse.ok) {
+                    const websiteData = await websiteResponse.json()
+                    if (websiteData.deals_inserted > 0) {
+                      return websiteData.deals_inserted || 0
+                    }
                   }
+                } catch (urlError) {
+                  // Try next URL
+                  continue
                 }
               }
+              return 0
+            } catch (error) {
+              console.warn(`Website extraction failed for ${dispensary.name}:`, error)
+              return 0
             }
-          } catch (flyerError) {
-            console.warn(`Flyer ingestion failed for ${dispensary.name}, trying website:`, flyerError)
-          }
+          })() : Promise.resolve(0),
+        ])
+
+        // Sum up deals from both sources
+        if (flyerResult.status === 'fulfilled') {
+          dealsFromThisDispensary += flyerResult.value
         }
-
-        // Try website extraction if no deals from flyer (or as alternative source)
-        if (dispensary.website && dealsFromThisDispensary === 0) {
-          try {
-            // Try common deals page paths
-            const possibleUrls = [
-              dispensary.website.endsWith('/') ? dispensary.website + 'deals' : dispensary.website + '/deals',
-              dispensary.website.endsWith('/') ? dispensary.website + 'specials' : dispensary.website + '/specials',
-              dispensary.website.endsWith('/') ? dispensary.website + 'menu' : dispensary.website + '/menu',
-              dispensary.website, // Fallback to homepage
-            ]
-
-            for (const url of possibleUrls) {
-              try {
-                const websiteResponse = await fetch(`${process.env.APP_URL}/api/ingest/website-deals`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    dispensary_name: dispensary.name,
-                    website_url: url,
-                    city: dispensary.city,
-                  }),
-                })
-
-                if (websiteResponse.ok) {
-                  const websiteData = await websiteResponse.json()
-                  if (websiteData.deals_inserted > 0) {
-                    dealsFromThisDispensary += websiteData.deals_inserted || 0
-                    break // Success, no need to try other URLs
-                  }
-                }
-              } catch (urlError) {
-                // Try next URL
-                continue
-              }
-            }
-          } catch (websiteError) {
-            console.warn(`Website extraction failed for ${dispensary.name}:`, websiteError)
-          }
+        if (websiteResult.status === 'fulfilled') {
+          dealsFromThisDispensary += websiteResult.value
         }
 
         if (dealsFromThisDispensary > 0) {
