@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { parseDealsFromText } from '@/lib/ai-parser'
-import { calculateDealHash, validateDealQuality, flagForReview } from '@/lib/deal-quality'
+import { calculateDealHash, validateDealQuality, flagForReview, type DealWithMetadata } from '@/lib/deal-quality'
 import { findOrCreateBrand, extractBrandFromTitle } from '@/lib/brand-extraction'
 
 export const dynamic = 'force-dynamic'
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
       const dealsToInsert: Array<{ deal: any; reviewReason?: string }> = []
       
       for (const deal of highConfidenceDeals) {
-        const dealWithMetadata = {
+        const dealWithMetadata: DealWithMetadata = {
           ...deal,
           dispensary_name: validated.dispensary_name,
           date: today,

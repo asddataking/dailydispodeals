@@ -2,7 +2,7 @@ import { createHash } from 'crypto'
 import { supabaseAdmin } from './supabase/server'
 import type { Deal } from './ai-parser'
 
-interface DealWithMetadata extends Deal {
+export interface DealWithMetadata extends Deal {
   dispensary_name: string
   date: string
   city?: string
