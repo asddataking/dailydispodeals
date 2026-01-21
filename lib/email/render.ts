@@ -1,3 +1,5 @@
+import { createHash } from 'crypto'
+
 export function renderDailyDealsEmail(
   deals: Array<{
     dispensary_name: string
@@ -11,7 +13,26 @@ export function renderDailyDealsEmail(
   userEmail: string,
   appUrl: string
 ): { subject: string; html: string } {
-  const subject = "Today's Dispo Deals (Your Picks)"
+  const dealCount = deals.length
+  const subject = `Today's Dispo Deals - ${dealCount} ${dealCount === 1 ? 'Deal' : 'Deals'} for You`
+  
+  // Generate unsubscribe token
+  const unsubscribeToken = createHash('sha256')
+    .update(`${userEmail}:${process.env.UNSUBSCRIBE_SECRET || 'change-me-in-production'}`)
+    .digest('hex')
+    .substring(0, 16)
+  
+  const unsubscribeUrl = `${appUrl}/api/unsubscribe?email=${encodeURIComponent(userEmail)}&token=${unsubscribeToken}`
+  
+  // Generate unsubscribe token
+  const crypto = require('crypto')
+  const unsubscribeToken = crypto
+    .createHash('sha256')
+    .update(`${userEmail}:${process.env.UNSUBSCRIBE_SECRET || 'change-me-in-production'}`)
+    .digest('hex')
+    .substring(0, 16)
+  
+  const unsubscribeUrl = `${appUrl}/api/unsubscribe?email=${encodeURIComponent(userEmail)}&token=${unsubscribeToken}`
   
   const dealCards = deals.map(deal => {
     const brandName = deal.brands?.name
@@ -49,7 +70,9 @@ export function renderDailyDealsEmail(
           <h2 style="color: #0a2540; margin: 0 0 24px 0; font-size: 20px;">Today's Picks</h2>
           ${dealCards}
           <p style="margin: 24px 0 0 0; color: #6b7280; font-size: 12px; text-align: center;">
-            Daily Dispo Deals - Your personalized cannabis deals delivered daily
+            Daily Dispo Deals - Your personalized cannabis deals delivered daily<br>
+            <a href="${unsubscribeUrl}" style="color: #9ca3af; text-decoration: underline;">Unsubscribe</a> | 
+            <a href="${appUrl}?email=${encodeURIComponent(userEmail)}" style="color: #9ca3af; text-decoration: underline;">Manage Preferences</a>
           </p>
         </div>
       </body>

@@ -12,6 +12,9 @@ import {
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
+const BATCH_SIZE = 10 // Process 10 emails in parallel
+const MAX_RETRIES = 3
+
 export async function GET(request: NextRequest) {
   // Verify cron secret
   const headersList = await headers()
@@ -35,164 +38,260 @@ export async function GET(request: NextRequest) {
   try {
     const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD
 
-    // Query active subscriptions with users and preferences
-    const { data: subscriptions, error: subError } = await supabaseAdmin
-      .from('subscriptions')
+    // Process notifications_outbox queue for DEALS_READY notifications
+    // Only process PENDING notifications that haven't exceeded retry limit
+    const { data: pendingNotifications, error: queueError } = await supabaseAdmin
+      .from('notifications_outbox')
       .select(`
         id,
-        user_id,
-        users!inner(email),
-        preferences(categories, brands, zip, radius)
+        email,
+        zone_id,
+        retry_count,
+        zones!inner(zip)
       `)
-      .eq('status', 'active')
-      .gt('current_period_end', new Date().toISOString())
+      .eq('type', 'DEALS_READY')
+      .eq('status', 'PENDING')
+      .lt('retry_count', MAX_RETRIES)
+      .order('created_at', { ascending: true })
+      .limit(100) // Process up to 100 notifications per run
 
-    if (subError) {
-      console.error('Failed to fetch subscriptions:', subError)
+    if (queueError) {
+      console.error('Failed to fetch notification queue:', queueError)
       return NextResponse.json(
-        { error: 'Failed to fetch subscriptions' },
+        { error: 'Failed to fetch notification queue' },
         { status: 500 }
       )
     }
 
-    if (!subscriptions || subscriptions.length === 0) {
-      return NextResponse.json({ sent: 0, failed: 0, skipped: 0 })
+    if (!pendingNotifications || pendingNotifications.length === 0) {
+      return NextResponse.json({ sent: 0, failed: 0, skipped: 0, message: 'No pending notifications' })
     }
 
     let sent = 0
     let failed = 0
     let skipped = 0
 
-    for (const sub of subscriptions) {
-      const user = sub.users as any
-      const preferences = sub.preferences as any
+    // Process notifications in batches
+    for (let i = 0; i < pendingNotifications.length; i += BATCH_SIZE) {
+      const batch = pendingNotifications.slice(i, i + BATCH_SIZE)
+      
+      // Process batch in parallel
+      await Promise.all(batch.map(async (notification) => {
+        const zone = notification.zones as any
+        const email = notification.email
 
-      // Check if email already sent today
-      const { data: existingLog } = await supabaseAdmin
-        .from('email_logs')
-        .select('id')
-        .eq('user_id', sub.user_id)
-        .eq('date', today)
-        .eq('status', 'sent')
-        .single()
+        try {
+          // Find user by email
+          const { data: user, error: userError } = await supabaseAdmin
+            .from('users')
+            .select('id')
+            .eq('email', email)
+            .single()
 
-      if (existingLog) {
-        skipped++
-        continue
-      }
+          if (userError || !user) {
+            // Mark as failed - user doesn't exist
+            await supabaseAdmin
+              .from('notifications_outbox')
+              .update({
+                status: 'FAILED',
+                error_message: 'User not found',
+                last_attempted_at: new Date().toISOString(),
+              })
+              .eq('id', notification.id)
+            failed++
+            return
+          }
 
-      // Get matching deals
-      if (!preferences || !preferences.categories || preferences.categories.length === 0) {
-        skipped++
-        continue
-      }
+          // Check if user has email enabled
+          const { data: preferences } = await supabaseAdmin
+            .from('preferences')
+            .select('categories, brands, zip, radius, email_enabled')
+            .eq('user_id', user.id)
+            .single()
 
-      // Filter deals by zone: only show deals from dispensaries in user's zones
-      const dispensariesInZones = await getDispensariesInUserZones(user.email)
-      if (dispensariesInZones.length === 0) {
-        skipped++
-        continue
-      }
+          if (!preferences || preferences.email_enabled === false) {
+            // User unsubscribed or no preferences
+            await supabaseAdmin
+              .from('notifications_outbox')
+              .update({
+                status: 'FAILED',
+                error_message: 'User unsubscribed or no preferences',
+                last_attempted_at: new Date().toISOString(),
+              })
+              .eq('id', notification.id)
+            skipped++
+            return
+          }
 
-      // Filter out stale deals (older than 2 days)
-      const twoDaysAgo = new Date(today)
-      twoDaysAgo.setDate(twoDaysAgo.getDate() - 2)
-      const twoDaysAgoStr = twoDaysAgo.toISOString().split('T')[0]
+          // Check if email already sent today (via email_logs)
+          const { data: existingLog } = await supabaseAdmin
+            .from('email_logs')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('date', today)
+            .eq('status', 'sent')
+            .single()
 
-      // Build query with brand join
-      let dealsQuery = supabaseAdmin
-        .from('deals')
-        .select(`
-          *,
-          brands (
-            id,
-            name
+          if (existingLog) {
+            // Already sent, mark notification as sent
+            await supabaseAdmin
+              .from('notifications_outbox')
+              .update({
+                status: 'SENT',
+                sent_at: new Date().toISOString(),
+                last_attempted_at: new Date().toISOString(),
+              })
+              .eq('id', notification.id)
+            skipped++
+            return
+          }
+
+          // Get matching deals
+          if (!preferences.categories || preferences.categories.length === 0) {
+            skipped++
+            return
+          }
+
+          // Filter deals by zone: only show deals from dispensaries in user's zones
+          const dispensariesInZones = await getDispensariesInUserZones(email)
+          if (dispensariesInZones.length === 0) {
+            skipped++
+            return
+          }
+
+          // Filter out stale deals (older than 2 days)
+          const twoDaysAgo = new Date(today)
+          twoDaysAgo.setDate(twoDaysAgo.getDate() - 2)
+          const twoDaysAgoStr = twoDaysAgo.toISOString().split('T')[0]
+
+          // Build query with brand join
+          let dealsQuery = supabaseAdmin
+            .from('deals')
+            .select(`
+              *,
+              brands (
+                id,
+                name
+              )
+            `)
+            .eq('date', today)
+            .gte('date', twoDaysAgoStr) // Only show deals from last 2 days
+            .in('category', preferences.categories)
+            .in('dispensary_name', dispensariesInZones)
+            .eq('needs_review', false) // Only show approved deals
+            .limit(10)
+
+          // If user has brand preferences, filter by brands
+          if (preferences.brands && preferences.brands.length > 0) {
+            // Get brand IDs for user's preferred brands
+            const { data: brandIds } = await supabaseAdmin
+              .from('brands')
+              .select('id')
+              .in('name', preferences.brands)
+
+            if (brandIds && brandIds.length > 0) {
+              const ids = brandIds.map(b => b.id)
+              dealsQuery = dealsQuery.in('brand_id', ids)
+            } else {
+              // User has brand preferences but no matching brands found
+              skipped++
+              return
+            }
+          }
+
+          const { data: deals } = await dealsQuery
+
+          if (!deals || deals.length === 0) {
+            skipped++
+            return
+          }
+
+          // Add distances for ranking (if user has ZIP)
+          const dealsWithDistances = await addDistancesToDeals(
+            deals,
+            preferences.zip || null
           )
-        `)
-        .eq('date', today)
-        .gte('date', twoDaysAgoStr) // Only show deals from last 2 days
-        .in('category', preferences.categories)
-        .in('dispensary_name', dispensariesInZones)
-        .eq('needs_review', false) // Only approved deals
-        .limit(10)
 
-      // If user has brand preferences, filter by brands
-      if (preferences.brands && preferences.brands.length > 0) {
-        // Get brand IDs for user's preferred brands
-        const { data: brandIds } = await supabaseAdmin
-          .from('brands')
-          .select('id')
-          .in('name', preferences.brands)
+          // Rank deals: group duplicates and rank by distance
+          const rankedDeals = rankDealsWithDistance(dealsWithDistances)
 
-        if (brandIds && brandIds.length > 0) {
-          const ids = brandIds.map(b => b.id)
-          dealsQuery = dealsQuery.in('brand_id', ids)
-        } else {
-          // User has brand preferences but no matching brands found
-          skipped++
-          continue
+          // Render and send email
+          const { subject, html } = renderDailyDealsEmail(
+            rankedDeals,
+            email,
+            process.env.APP_URL || 'https://dailydispodeals.com'
+          )
+
+          await resend.emails.send({
+            from: 'Daily Dispo Deals <deals@dailydispodeals.com>',
+            to: email,
+            subject,
+            html,
+          })
+
+          // Log success
+          await supabaseAdmin
+            .from('email_logs')
+            .insert({
+              user_id: user.id,
+              date: today,
+              status: 'sent',
+            })
+
+          // Mark notification as sent
+          await supabaseAdmin
+            .from('notifications_outbox')
+            .update({
+              status: 'SENT',
+              sent_at: new Date().toISOString(),
+              last_attempted_at: new Date().toISOString(),
+            })
+            .eq('id', notification.id)
+
+          sent++
+        } catch (emailError) {
+          console.error(`Failed to send email to ${email}:`, emailError)
+          
+          // Increment retry count
+          const newRetryCount = notification.retry_count + 1
+          const shouldRetry = newRetryCount < MAX_RETRIES
+
+          await supabaseAdmin
+            .from('notifications_outbox')
+            .update({
+              retry_count: newRetryCount,
+              last_attempted_at: new Date().toISOString(),
+              error_message: emailError instanceof Error ? emailError.message.substring(0, 500) : 'Unknown error',
+              status: shouldRetry ? 'PENDING' : 'FAILED',
+            })
+            .eq('id', notification.id)
+
+          // Log failure if this was the last retry
+          if (!shouldRetry) {
+            const { data: user } = await supabaseAdmin
+              .from('users')
+              .select('id')
+              .eq('email', email)
+              .single()
+
+            if (user) {
+              await supabaseAdmin
+                .from('email_logs')
+                .insert({
+                  user_id: user.id,
+                  date: today,
+                  status: 'failed',
+                  error: emailError instanceof Error ? emailError.message : 'Unknown error',
+                })
+            }
+          }
+
+          failed++
         }
-      }
-
-      const { data: deals } = await dealsQuery
-
-      if (!deals || deals.length === 0) {
-        skipped++
-        continue
-      }
-
-      // Add distances for ranking (if user has ZIP)
-      const dealsWithDistances = await addDistancesToDeals(
-        deals,
-        preferences.zip || null
-      )
-
-      // Rank deals: group duplicates and rank by distance
-      const rankedDeals = rankDealsWithDistance(dealsWithDistances)
-
-      // Render and send email
-      try {
-        const { subject, html } = renderDailyDealsEmail(
-          rankedDeals,
-          user.email,
-          process.env.APP_URL || 'https://dailydispodeals.com'
-        )
-
-        await resend.emails.send({
-          from: 'Daily Dispo Deals <deals@dailydispodeals.com>',
-          to: user.email,
-          subject,
-          html,
-        })
-
-        // Log success
-        await supabaseAdmin
-          .from('email_logs')
-          .insert({
-            user_id: sub.user_id,
-            date: today,
-            status: 'sent',
-          })
-
-        sent++
-      } catch (emailError) {
-        console.error('Failed to send email:', emailError)
-        
-        // Log failure
-        await supabaseAdmin
-          .from('email_logs')
-          .insert({
-            user_id: sub.user_id,
-            date: today,
-            status: 'failed',
-            error: emailError instanceof Error ? emailError.message : 'Unknown error',
-          })
-
-        failed++
-      }
+      }))
     }
 
-    return NextResponse.json({ sent, failed, skipped })
+    return NextResponse.json({ sent, failed, skipped, processed: pendingNotifications.length })
   } catch (error) {
     console.error('Cron error:', error)
     return NextResponse.json(
