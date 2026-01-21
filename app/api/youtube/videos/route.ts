@@ -17,7 +17,7 @@ export async function GET(_request: NextRequest) {
       return NextResponse.json({ videos: cachedVideos, cached: true })
     }
 
-    const videos = await getLatestVideosFromEnvChannel(2)
+    const videos = await getLatestVideosFromEnvChannel(3)
 
     cachedVideos = videos
     cachedAt = now

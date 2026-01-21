@@ -376,16 +376,48 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Affiliate Deal Section */}
+      <section className="py-12 sm:py-16 md:py-20 px-4 sm:px-6 md:px-12 bg-gradient-to-b from-white to-lake-blue-50/30">
+        <div className="max-w-6xl mx-auto">
+          <div className="bg-white rounded-xl p-6 sm:p-8 md:p-12 shadow-xl border border-lake-blue-100">
+            <div className="grid md:grid-cols-2 gap-6 sm:gap-8 items-center">
+              <div>
+                <div className="text-xs sm:text-sm text-gray-500 mb-2 font-medium">AFFILIATE DEAL</div>
+                <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-lake-blue-900 mb-4">
+                  20% Off Arizer XQ2 Vaporizers!
+                </h2>
+                <p className="text-sm sm:text-base text-gray-700 mb-6">
+                  Use code DANK20 at checkout for 20% off the best dry herb vaporizer.
+                </p>
+                <button className="bg-lake-blue-700 text-white px-6 py-3 rounded-lg font-semibold hover:bg-lake-blue-800 transition shadow-lg min-h-[48px] w-full sm:w-auto">
+                  Shop Now →
+                </button>
+              </div>
+              <div className="h-48 sm:h-64 bg-gradient-to-br from-lake-blue-100 to-lake-blue-200 rounded-lg flex items-center justify-center">
+                {/* Image placeholder for Vaporizer */}
+                <div className="text-lake-blue-700 text-sm sm:text-base px-4 text-center">Image: Arizer XQ2 Vaporizer</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Latest from Dank N' Devour Section */}
       <section className="py-12 sm:py-16 md:py-20 px-4 sm:px-6 md:px-12 bg-white">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-lake-blue-900 mb-8 sm:mb-12 text-center sm:text-left">
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-100px' }}
+            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+            className="text-3xl sm:text-4xl md:text-5xl font-bold text-lake-blue-900 mb-8 sm:mb-12 text-center sm:text-left"
+          >
             Latest from Dank N&apos; Devour
-          </h2>
+          </motion.h2>
 
           {videosLoading && (
-            <div className="grid sm:grid-cols-2 gap-6 sm:gap-8">
-              {[0, 1].map((i) => (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+              {[0, 1, 2].map((i) => (
                 <div
                   key={i}
                   className="bg-white rounded-xl overflow-hidden shadow-lg border border-lake-blue-100 animate-pulse"
@@ -409,8 +441,8 @@ export default function Home() {
           )}
 
           {!videosLoading && !videosError && videos.length > 0 && (
-            <div className="grid sm:grid-cols-2 gap-6 sm:gap-8">
-              {videos.map((video, index) => (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+              {videos.slice(0, 3).map((video, index) => (
                 <motion.a
                   key={video.id}
                   href={video.url}
@@ -460,32 +492,6 @@ export default function Home() {
               ))}
             </div>
           )}
-        </div>
-      </section>
-
-      {/* Affiliate Deal Section */}
-      <section className="py-12 sm:py-16 md:py-20 px-4 sm:px-6 md:px-12 bg-gradient-to-b from-white to-lake-blue-50/30">
-        <div className="max-w-6xl mx-auto">
-          <div className="bg-white rounded-xl p-6 sm:p-8 md:p-12 shadow-xl border border-lake-blue-100">
-            <div className="grid md:grid-cols-2 gap-6 sm:gap-8 items-center">
-              <div>
-                <div className="text-xs sm:text-sm text-gray-500 mb-2 font-medium">AFFILIATE DEAL</div>
-                <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-lake-blue-900 mb-4">
-                  20% Off Arizer XQ2 Vaporizers!
-                </h2>
-                <p className="text-sm sm:text-base text-gray-700 mb-6">
-                  Use code DANK20 at checkout for 20% off the best dry herb vaporizer.
-                </p>
-                <button className="bg-lake-blue-700 text-white px-6 py-3 rounded-lg font-semibold hover:bg-lake-blue-800 transition shadow-lg min-h-[48px] w-full sm:w-auto">
-                  Shop Now →
-                </button>
-              </div>
-              <div className="h-48 sm:h-64 bg-gradient-to-br from-lake-blue-100 to-lake-blue-200 rounded-lg flex items-center justify-center">
-                {/* Image placeholder for Vaporizer */}
-                <div className="text-lake-blue-700 text-sm sm:text-base px-4 text-center">Image: Arizer XQ2 Vaporizer</div>
-              </div>
-            </div>
-          </div>
         </div>
       </section>
 
