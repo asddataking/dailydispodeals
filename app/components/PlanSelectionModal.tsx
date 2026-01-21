@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import * as Dialog from '@radix-ui/react-dialog'
 
 interface PlanSelectionModalProps {
@@ -46,8 +47,28 @@ export function PlanSelectionModal({ open, onOpenChange, initialEmail = '' }: Pl
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="modal-overlay" />
-        <Dialog.Content className="modal-content bg-white rounded-lg shadow-xl p-4 sm:p-6 md:p-8 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <AnimatePresence>
+          {open && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="modal-overlay"
+                asChild
+              >
+                <Dialog.Overlay />
+              </motion.div>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                className="modal-content bg-white rounded-lg shadow-xl p-4 sm:p-6 md:p-8 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto"
+                asChild
+              >
+                <Dialog.Content>
           <Dialog.Title className="text-xl sm:text-2xl font-bold text-lake-blue-900 mb-4">
             Choose Your Plan
           </Dialog.Title>
@@ -73,34 +94,33 @@ export function PlanSelectionModal({ open, onOpenChange, initialEmail = '' }: Pl
                 Select Plan
               </label>
               <div className="space-y-3">
-                <label className="flex items-center p-3 sm:p-4 border-2 rounded-lg cursor-pointer hover:bg-gray-50 min-h-[60px]">
-                  <input
-                    type="radio"
-                    name="plan"
-                    value="monthly"
-                    checked={plan === 'monthly'}
-                    onChange={() => setPlan('monthly')}
-                    className="mr-3 w-5 h-5"
-                  />
-                  <div className="flex-1">
-                    <div className="font-semibold text-sm sm:text-base">Monthly</div>
-                    <div className="text-xs sm:text-sm text-gray-600">$4.20/month</div>
-                  </div>
-                </label>
-                <label className="flex items-center p-3 sm:p-4 border-2 rounded-lg cursor-pointer hover:bg-gray-50 min-h-[60px]">
-                  <input
-                    type="radio"
-                    name="plan"
-                    value="yearly"
-                    checked={plan === 'yearly'}
-                    onChange={() => setPlan('yearly')}
-                    className="mr-3 w-5 h-5"
-                  />
-                  <div className="flex-1">
-                    <div className="font-semibold text-sm sm:text-base">Yearly</div>
-                    <div className="text-xs sm:text-sm text-gray-600">$42/year (Save $8.40)</div>
-                  </div>
-                </label>
+                {[
+                  { value: 'monthly', label: 'Monthly', price: '$4.20/month' },
+                  { value: 'yearly', label: 'Yearly', price: '$42/year (Save $8.40)' },
+                ].map((option, index) => (
+                  <motion.label
+                    key={option.value}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.4, delay: index * 0.1 }}
+                    whileHover={{ scale: 1.02, x: 4 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="flex items-center p-3 sm:p-4 border-2 rounded-lg cursor-pointer hover:bg-gray-50 min-h-[60px]"
+                  >
+                    <input
+                      type="radio"
+                      name="plan"
+                      value={option.value}
+                      checked={plan === option.value}
+                      onChange={() => setPlan(option.value as 'monthly' | 'yearly')}
+                      className="mr-3 w-5 h-5"
+                    />
+                    <div className="flex-1">
+                      <div className="font-semibold text-sm sm:text-base">{option.label}</div>
+                      <div className="text-xs sm:text-sm text-gray-600">{option.price}</div>
+                    </div>
+                  </motion.label>
+                ))}
               </div>
             </div>
 
@@ -108,21 +128,32 @@ export function PlanSelectionModal({ open, onOpenChange, initialEmail = '' }: Pl
               <div className="text-red-600 text-sm">{error}</div>
             )}
 
-            <button
+            <motion.button
               type="submit"
               disabled={loading}
+              whileHover={{ scale: loading ? 1 : 1.02 }}
+              whileTap={{ scale: loading ? 1 : 0.98 }}
               className="w-full bg-lake-blue-700 text-white py-3 rounded-md font-semibold hover:bg-lake-blue-800 disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px] text-base"
             >
               {loading ? 'Processing...' : 'Continue to Checkout'}
-            </button>
+            </motion.button>
           </form>
 
           <Dialog.Close asChild>
-            <button className="absolute top-3 right-3 sm:top-4 sm:right-4 text-gray-400 hover:text-gray-600 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center">
+            <motion.button
+              whileHover={{ scale: 1.1, rotate: 90 }}
+              whileTap={{ scale: 0.9 }}
+              transition={{ duration: 0.2 }}
+              className="absolute top-3 right-3 sm:top-4 sm:right-4 text-gray-400 hover:text-gray-600 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"
+            >
               ✕
-            </button>
+            </motion.button>
           </Dialog.Close>
-        </Dialog.Content>
+                </Dialog.Content>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
       </Dialog.Portal>
     </Dialog.Root>
   )

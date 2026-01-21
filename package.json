@@ -24,7 +24,8 @@
     "@ai-sdk/openai": "^3.0.13",
     "@ai-sdk/google": "^3.0.10",
     "@upstash/ratelimit": "^2.0.6",
-    "@upstash/redis": "^1.35.3"
+    "@upstash/redis": "^1.35.3",
+    "framer-motion": "^11.0.0"
   },
   "devDependencies": {
     "typescript": "^5.6.2",
