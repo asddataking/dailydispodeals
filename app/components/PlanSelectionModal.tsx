@@ -47,28 +47,26 @@ export function PlanSelectionModal({ open, onOpenChange, initialEmail = '' }: Pl
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <AnimatePresence>
+        <AnimatePresence mode="wait">
           {open && (
             <>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="modal-overlay"
-                asChild
-              >
-                <Dialog.Overlay />
-              </motion.div>
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                className="modal-content bg-white rounded-lg shadow-xl p-4 sm:p-6 md:p-8 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto"
-                asChild
-              >
-                <Dialog.Content>
+              <Dialog.Overlay asChild>
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="modal-overlay"
+                />
+              </Dialog.Overlay>
+              <Dialog.Content asChild>
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                  transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                  className="modal-content bg-white rounded-lg shadow-xl p-4 sm:p-6 md:p-8 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto"
+                >
           <Dialog.Title className="text-xl sm:text-2xl font-bold text-lake-blue-900 mb-4">
             Choose Your Plan
           </Dialog.Title>
@@ -149,8 +147,8 @@ export function PlanSelectionModal({ open, onOpenChange, initialEmail = '' }: Pl
               ✕
             </motion.button>
           </Dialog.Close>
-                </Dialog.Content>
-              </motion.div>
+                </motion.div>
+              </Dialog.Content>
             </>
           )}
         </AnimatePresence>
