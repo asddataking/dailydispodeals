@@ -144,21 +144,24 @@ export async function PUT(request: NextRequest) {
 
     const { id, ...updates } = validated
 
+    // Build update object with geocoding if zip is updated
+    const updateData: Record<string, any> = {
+      ...updates,
+      updated_at: new Date().toISOString(),
+    }
+
     // Geocode zip if it's being updated
     if (updates.zip) {
       const location = await geocodeZip(updates.zip)
       if (location) {
-        updates.latitude = location.latitude
-        updates.longitude = location.longitude
+        updateData.latitude = location.latitude
+        updateData.longitude = location.longitude
       }
     }
 
     const { data, error } = await supabaseAdmin
       .from('dispensaries')
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', id)
       .select()
       .single()
