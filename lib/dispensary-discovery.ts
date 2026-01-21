@@ -65,7 +65,7 @@ export async function addDispensary(
   // Check if dispensary already exists
   const { data: existing } = await supabaseAdmin
     .from('dispensaries')
-    .select('id')
+    .select('id, city, zip, latitude, longitude, weedmaps_url, flyer_url')
     .eq('name', dispensary.name)
     .single()
 
