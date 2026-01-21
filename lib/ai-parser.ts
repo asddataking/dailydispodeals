@@ -1,3 +1,6 @@
+import { generateText } from 'ai'
+import { createOpenAI } from '@ai-sdk/openai'
+import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { z } from 'zod'
 
 const DealSchema = z.object({
@@ -15,16 +18,38 @@ const ParseResponseSchema = z.object({
 
 /**
  * Parse deals from OCR text using Vercel AI Gateway
+ * Supports both OpenAI and Google Gemini models
  */
 export async function parseDealsFromText(
   ocrText: string,
   dispensaryName: string,
   city?: string
 ): Promise<Deal[]> {
-  const aiGatewayUrl = process.env.AI_GATEWAY_URL || 'https://gateway.vercel.ai/v1/chat/completions'
-  
   if (!process.env.AI_GATEWAY_API_KEY) {
     throw new Error('AI_GATEWAY_API_KEY is not configured')
+  }
+
+  // Determine which provider to use (defaults to OpenAI, set AI_MODEL_PROVIDER=google for Gemini)
+  const provider = process.env.AI_MODEL_PROVIDER || 'openai'
+  const aiGatewayUrl = process.env.AI_GATEWAY_URL || 'https://gateway.vercel.ai/v1'
+
+  let model: any
+
+  if (provider === 'google') {
+    // Use Google Gemini Flash (much cheaper: ~50% cost savings)
+    const google = createGoogleGenerativeAI({
+      apiKey: process.env.AI_GATEWAY_API_KEY,
+      baseURL: aiGatewayUrl,
+    })
+    // Gemini 1.5 Flash model
+    model = google('gemini-1.5-flash')
+  } else {
+    // Use OpenAI GPT-4o-mini (default)
+    const openai = createOpenAI({
+      apiKey: process.env.AI_GATEWAY_API_KEY,
+      baseURL: aiGatewayUrl,
+    })
+    model = openai('gpt-4o-mini')
   }
 
   const systemPrompt = `You are extracting cannabis deal data from a dispensary flyer. Return a JSON array with:
@@ -53,46 +78,19 @@ Return only valid JSON in this format:
 }`
 
   try {
-    const response = await fetch(aiGatewayUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.AI_GATEWAY_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt,
-          },
-          {
-            role: 'user',
-            content: userPrompt,
-          },
-        ],
-        temperature: 0.1,
-        response_format: { type: 'json_object' },
-      }),
+    const result = await generateText({
+      model,
+      system: systemPrompt,
+      prompt: userPrompt,
+      temperature: 0.1,
+      schema: ParseResponseSchema,
     })
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`AI Gateway error: ${response.status} ${errorText}`)
-    }
-
-    const data = await response.json()
-    const content = data.choices?.[0]?.message?.content
-
-    if (!content) {
-      throw new Error('No response from AI Gateway')
-    }
-
-    const parsed = JSON.parse(content)
-    const validated = ParseResponseSchema.parse(parsed)
+    // With structured outputs, the result.object contains the parsed and validated data
+    const parsedData = result.object as { deals: Deal[] }
     
     // Filter deals with confidence < 0.5 (they'll be handled as summary entries)
-    return validated.deals.filter(deal => (deal.confidence ?? 1) >= 0.5)
+    return parsedData.deals.filter(deal => (deal.confidence ?? 1) >= 0.5)
   } catch (error) {
     console.error('AI parsing error:', error)
     throw new Error(`AI parsing failed: ${error instanceof Error ? error.message : 'Unknown error'}`)

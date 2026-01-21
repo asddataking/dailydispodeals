@@ -122,13 +122,18 @@ Or use the Supabase dashboard SQL editor to run the migration file.
 
 1. Go to your [Vercel Dashboard](https://vercel.com/dashboard)
 2. Navigate to your project → Settings → AI Gateway
-3. Enable AI Gateway and configure it to proxy OpenAI requests
+3. Enable AI Gateway and configure it to proxy AI requests (OpenAI or Google Gemini)
 4. Get your AI Gateway API key and URL from the dashboard
 5. Add to `.env.local`:
-   - `AI_GATEWAY_URL` (optional, defaults to Vercel's gateway endpoint if not set)
+   - `AI_GATEWAY_URL` (optional, defaults to `https://gateway.vercel.ai/v1` if not set)
    - `AI_GATEWAY_API_KEY` (required, your gateway API key)
+   - `AI_MODEL_PROVIDER` (optional, set to `google` to use Gemini Flash, defaults to `openai`)
 
-**Note:** Vercel AI Gateway provides caching, rate limiting, and cost optimization for AI requests. It proxies requests to OpenAI or other providers configured in your gateway settings.
+**Model Options:**
+- **OpenAI GPT-4o-mini** (default): ~$0.15/1M input, $0.60/1M output tokens
+- **Google Gemini 1.5 Flash** (`AI_MODEL_PROVIDER=google`): ~$0.075/1M input, $0.30/1M output tokens (~50% cheaper)
+
+**Note:** Vercel AI Gateway provides caching, rate limiting, and cost optimization for AI requests. For deal parsing with daily ingestion, Gemini Flash can significantly reduce costs while maintaining quality.
 
 ### 7. Generate Cron Secrets
 
