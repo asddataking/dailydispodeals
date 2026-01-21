@@ -79,7 +79,7 @@ export async function getLatestVideosForChannel(
           url: `https://www.youtube.com/watch?v=${videoId}`,
         }
       })
-      .filter((v): v is YouTubeVideo => v !== null)
+      .filter((v: YouTubeVideo | null): v is YouTubeVideo => v !== null)
   } catch (error) {
     console.error('Error fetching latest YouTube videos:', error)
     return []
