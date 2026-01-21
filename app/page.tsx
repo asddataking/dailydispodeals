@@ -47,11 +47,11 @@ export default function Home() {
         <div className="max-w-7xl mx-auto w-full grid lg:grid-cols-2 gap-8 lg:gap-12 items-start relative z-10 pt-20">
           {/* Hero Content - Left Side */}
           <div className="pt-12 lg:pt-20">
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold mb-6 text-lake-blue-900 leading-tight drop-shadow-sm">
-              Daily cannabis deals. Zero searching.
+            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold mb-6 text-white leading-tight drop-shadow-lg">
+              Daily Dispo Deals
             </h1>
-            <p className="text-xl md:text-2xl mb-8 text-lake-blue-900 leading-relaxed drop-shadow-sm">
-              Tell us what you buy. We email you the best deals every day.
+            <p className="text-5xl md:text-6xl lg:text-7xl font-bold mb-8 text-white leading-tight drop-shadow-lg">
+              Zero Searching.
             </p>
             <form onSubmit={handleGetDeals} className="max-w-lg mb-4">
               <div className="flex gap-2">
