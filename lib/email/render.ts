@@ -24,16 +24,6 @@ export function renderDailyDealsEmail(
   
   const unsubscribeUrl = `${appUrl}/api/unsubscribe?email=${encodeURIComponent(userEmail)}&token=${unsubscribeToken}`
   
-  // Generate unsubscribe token
-  const crypto = require('crypto')
-  const unsubscribeToken = crypto
-    .createHash('sha256')
-    .update(`${userEmail}:${process.env.UNSUBSCRIBE_SECRET || 'change-me-in-production'}`)
-    .digest('hex')
-    .substring(0, 16)
-  
-  const unsubscribeUrl = `${appUrl}/api/unsubscribe?email=${encodeURIComponent(userEmail)}&token=${unsubscribeToken}`
-  
   const dealCards = deals.map(deal => {
     const brandName = deal.brands?.name
     const displayTitle = brandName && deal.product_name 
