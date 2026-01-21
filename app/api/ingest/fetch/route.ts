@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { downloadFile, computeFileHash } from '@/lib/file-utils'
+import { rateLimit } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -12,6 +13,12 @@ const schema = z.object({
 })
 
 export async function POST(request: NextRequest) {
+  // Rate limiting - strict for ingestion endpoints (expensive operations)
+  const rateLimitResult = await rateLimit(request, 'strict')
+  if (!rateLimitResult.success) {
+    return rateLimitResult.response
+  }
+
   try {
     const body = await request.json()
     const validated = schema.parse(body)

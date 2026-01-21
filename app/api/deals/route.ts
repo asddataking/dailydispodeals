@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/server'
+import { rateLimit } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -22,6 +23,12 @@ function parsePrice(priceText: string): number {
 }
 
 export async function GET(request: NextRequest) {
+  // Rate limiting - moderate for deals endpoint
+  const rateLimitResult = await rateLimit(request, 'moderate')
+  if (!rateLimitResult.success) {
+    return rateLimitResult.response
+  }
+
   try {
     const searchParams = request.nextUrl.searchParams
     const email = searchParams.get('email')

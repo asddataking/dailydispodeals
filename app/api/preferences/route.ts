@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { getDispensariesNearZip } from '@/lib/dispensary-discovery'
+import { rateLimit } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -15,6 +16,12 @@ const schema = z.object({
 })
 
 export async function POST(request: NextRequest) {
+  // Rate limiting - moderate for preferences endpoint
+  const rateLimitResult = await rateLimit(request, 'moderate')
+  if (!rateLimitResult.success) {
+    return rateLimitResult.response
+  }
+
   try {
     const body = await request.json()
     const validated = schema.parse(body)

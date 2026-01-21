@@ -10,21 +10,45 @@ function SuccessContent() {
   const [email, setEmail] = useState<string>('')
   const [showModal, setShowModal] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // In a real implementation, you'd fetch the session from Stripe to get the email
-    // For MVP, we'll extract from URL params or use a placeholder
-    const emailParam = searchParams.get('email')
-    if (emailParam) {
-      setEmail(emailParam)
+    const fetchEmail = async () => {
+      if (!sessionId) {
+        setError('Missing session ID')
+        setLoading(false)
+        return
+      }
+
+      try {
+        // Fetch email from Stripe session
+        const response = await fetch(`/api/stripe/get-session?session_id=${sessionId}`)
+        const data = await response.json()
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to fetch session')
+        }
+
+        if (data.email) {
+          setEmail(data.email)
+          // Small delay for better UX
+          setTimeout(() => {
+            setShowModal(true)
+            setLoading(false)
+          }, 500)
+        } else {
+          setError('Email not found in session')
+          setLoading(false)
+        }
+      } catch (err) {
+        console.error('Error fetching session:', err)
+        setError(err instanceof Error ? err.message : 'Failed to load session')
+        setLoading(false)
+      }
     }
-    
-    // Show preferences modal after a short delay
-    setTimeout(() => {
-      setShowModal(true)
-      setLoading(false)
-    }, 500)
-  }, [searchParams])
+
+    fetchEmail()
+  }, [sessionId])
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-lake-blue-900 to-lake-blue-700 flex items-center justify-center p-4">
@@ -37,11 +61,19 @@ function SuccessContent() {
           Welcome to Daily Dispo Deals. Let&apos;s set up your preferences to get you the best deals.
         </p>
         {loading && (
-          <div className="text-gray-500 text-sm sm:text-base">Loading...</div>
+          <div className="text-gray-500 text-sm sm:text-base">Loading your session...</div>
+        )}
+        {error && (
+          <div className="text-red-600 text-sm sm:text-base mt-4">
+            {error}
+            <p className="text-gray-600 text-xs mt-2">
+              Please contact support if this issue persists.
+            </p>
+          </div>
         )}
       </div>
 
-      {email && (
+      {email && !error && (
         <PreferencesModal
           open={showModal}
           onOpenChange={setShowModal}

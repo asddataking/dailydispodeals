@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { stripe } from '@/lib/stripe'
+import { rateLimit } from '@/lib/rate-limit'
 
 // Mark route as dynamic to prevent static analysis during build
 export const dynamic = 'force-dynamic'
@@ -12,6 +13,12 @@ const schema = z.object({
 })
 
 export async function POST(request: NextRequest) {
+  // Rate limiting - strict for payment endpoints
+  const rateLimitResult = await rateLimit(request, 'strict')
+  if (!rateLimitResult.success) {
+    return rateLimitResult.response
+  }
+
   try {
     const body = await request.json()
     const validated = schema.parse(body)

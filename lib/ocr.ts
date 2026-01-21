@@ -1,21 +1,73 @@
 import OpenAI from 'openai'
+import { createGoogleGenerativeAI } from '@ai-sdk/google'
+import { generateText } from 'ai'
 
-const openai = process.env.OPENAI_API_KEY ? new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-}) : null
+const openai = process.env.OPENAI_API_KEY
+  ? new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    })
+  : null
 
+/**
+ * Extract text from an image or PDF buffer.
+ *
+ * Primary path: Gemini via Vercel AI Gateway (cheaper, configurable).
+ * Fallback: OpenAI Vision (gpt-4o) if gateway/Gemini is not configured or fails.
+ */
 export async function extractTextFromImage(
   imageBuffer: Buffer,
   mimeType: string
 ): Promise<{ text: string; confidence?: number }> {
-  // Use OpenAI Vision API
+  const apiKey = process.env.AI_GATEWAY_API_KEY
+  const baseURL = process.env.AI_GATEWAY_URL || 'https://gateway.vercel.ai/v1'
+
+  // Prefer Gemini via Vercel AI Gateway when configured
+  if (apiKey) {
+    try {
+      const google = createGoogleGenerativeAI({
+        apiKey,
+        baseURL,
+      })
+
+      // Use a vision-capable, cost-efficient Gemini model
+      const model = google('gemini-2.5-flash-image')
+
+      const result = await generateText({
+        model,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: 'Extract all text from this dispensary flyer. Return only the text content, no explanations.',
+              },
+              {
+                type: 'file',
+                mediaType: mimeType,
+                data: imageBuffer,
+              },
+            ],
+          },
+        ],
+      })
+
+      const text = (result.text || '').trim()
+      return { text, confidence: 0.9 }
+    } catch (error) {
+      console.error('Gemini OCR error (falling back to OpenAI if available):', error)
+      // fall through to OpenAI fallback if configured
+    }
+  }
+
+  // Fallback: OpenAI Vision API if configured
   if (!openai) {
-    throw new Error('OPENAI_API_KEY is not configured')
+    throw new Error('No OCR provider configured: set AI_GATEWAY_API_KEY for Gemini or OPENAI_API_KEY for OpenAI.')
   }
 
   try {
     const base64Image = imageBuffer.toString('base64')
-    
+
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
@@ -38,10 +90,10 @@ export async function extractTextFromImage(
       max_tokens: 4000,
     })
 
-    const text = response.choices[0]?.message?.content || ''
+    const text = (response.choices[0]?.message?.content || '').trim()
     return { text, confidence: 0.9 }
   } catch (error) {
-    console.error('OCR error:', error)
+    console.error('OpenAI OCR error:', error)
     throw new Error(`OCR failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 }

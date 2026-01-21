@@ -1,14 +1,27 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { PlanSelectionModal } from './components/PlanSelectionModal'
 import { StructuredData } from './components/StructuredData'
 import { FAQ } from './components/FAQ'
+import { ManagePreferencesModal } from './components/ManagePreferencesModal'
 
 export default function Home() {
   const [email, setEmail] = useState('')
   const [showPlanModal, setShowPlanModal] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [managePrefsOpen, setManagePrefsOpen] = useState(false)
+  const [videos, setVideos] = useState<
+    Array<{
+      id: string
+      title: string
+      description: string
+      thumbnailUrl: string
+      url: string
+    }>
+  >([])
+  const [videosLoading, setVideosLoading] = useState(true)
+  const [videosError, setVideosError] = useState<string | null>(null)
 
   // Structured data for SEO
   const structuredData = {
@@ -45,6 +58,26 @@ export default function Home() {
       setShowPlanModal(true)
     }
   }
+
+  useEffect(() => {
+    const fetchVideos = async () => {
+      try {
+        const res = await fetch('/api/youtube/videos')
+        if (!res.ok) {
+          throw new Error(`Failed to load videos: ${res.status}`)
+        }
+        const data = await res.json()
+        setVideos(data.videos || [])
+      } catch (error) {
+        console.error(error)
+        setVideosError('Unable to load latest videos right now.')
+      } finally {
+        setVideosLoading(false)
+      }
+    }
+
+    fetchVideos()
+  }, [])
 
   return (
     <div className="min-h-screen bg-white">
@@ -267,44 +300,74 @@ export default function Home() {
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-lake-blue-900 mb-8 sm:mb-12 text-center sm:text-left">
             Latest from Dank N&apos; Devour
           </h2>
-          <div className="grid sm:grid-cols-2 gap-6 sm:gap-8">
-            <div className="bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition border border-lake-blue-100">
-              <div className="h-48 sm:h-64 bg-gradient-to-br from-lake-blue-100 to-lake-blue-200 relative">
-                {/* Image placeholder for Teriyaki Wings */}
-                <div className="absolute inset-0 flex items-center justify-center text-lake-blue-700 text-sm sm:text-base px-4 text-center">
-                  Image: Teriyaki Cannabis Wings
+
+          {videosLoading && (
+            <div className="grid sm:grid-cols-2 gap-6 sm:gap-8">
+              {[0, 1].map((i) => (
+                <div
+                  key={i}
+                  className="bg-white rounded-xl overflow-hidden shadow-lg border border-lake-blue-100 animate-pulse"
+                >
+                  <div className="h-48 sm:h-64 bg-lake-blue-100" />
+                  <div className="p-4 sm:p-6 space-y-3">
+                    <div className="h-4 bg-gray-200 rounded w-24" />
+                    <div className="h-5 bg-gray-200 rounded w-3/4" />
+                    <div className="h-4 bg-gray-200 rounded w-full" />
+                    <div className="h-10 bg-gray-200 rounded w-32" />
+                  </div>
                 </div>
-              </div>
-              <div className="p-4 sm:p-6">
-                <div className="text-xs sm:text-sm text-gray-500 mb-2 font-medium">CHRONIC COOKING</div>
-                <h3 className="text-lg sm:text-xl font-semibold mb-2 text-lake-blue-900">Teriyaki Cannabis Wings</h3>
-                <p className="text-gray-700 text-xs sm:text-sm mb-4">
-                  How i&apos;a makes sticky, savory, cannabis infused teriyaki chicken wings.
-                </p>
-                <button className="text-lake-blue-700 font-semibold hover:text-lake-blue-800 text-sm sm:text-base py-2 min-h-[44px]">
-                  Watch Now →
-                </button>
-              </div>
+              ))}
             </div>
-            <div className="bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition border border-lake-blue-100">
-              <div className="h-48 sm:h-64 bg-gradient-to-br from-lake-blue-100 to-lake-blue-200 relative">
-                {/* Image placeholder for Gummies */}
-                <div className="absolute inset-0 flex items-center justify-center text-lake-blue-700 text-sm sm:text-base px-4 text-center">
-                  Image: The Highest Gummies Ever?
-                </div>
-              </div>
-              <div className="p-4 sm:p-6">
-                <div className="text-xs sm:text-sm text-gray-500 mb-2 font-medium">STRAIN REVIEWS</div>
-                <h3 className="text-lg sm:text-xl font-semibold mb-2 text-lake-blue-900">The Highest Gummies Ever?</h3>
-                <p className="text-gray-700 text-xs sm:text-sm mb-4">
-                  We review and test the most potent looking gummies.
-                </p>
-                <button className="text-lake-blue-700 font-semibold hover:text-lake-blue-800 text-sm sm:text-base py-2 min-h-[44px]">
-                  Watch Now →
-                </button>
-              </div>
+          )}
+
+          {!videosLoading && videosError && (
+            <div className="text-sm sm:text-base text-gray-600">
+              {videosError}
             </div>
-          </div>
+          )}
+
+          {!videosLoading && !videosError && videos.length > 0 && (
+            <div className="grid sm:grid-cols-2 gap-6 sm:gap-8">
+              {videos.map((video) => (
+                <a
+                  key={video.id}
+                  href={video.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition border border-lake-blue-100 group"
+                >
+                  <div className="h-48 sm:h-64 bg-gray-200 overflow-hidden">
+                    {video.thumbnailUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={video.thumbnailUrl}
+                        alt={video.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-lake-blue-700 text-sm sm:text-base px-4 text-center bg-gradient-to-br from-lake-blue-100 to-lake-blue-200">
+                        Video thumbnail
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-4 sm:p-6">
+                    <div className="text-xs sm:text-sm text-gray-500 mb-2 font-medium">
+                      DANK N&apos; DEVOUR
+                    </div>
+                    <h3 className="text-lg sm:text-xl font-semibold mb-2 text-lake-blue-900 line-clamp-2">
+                      {video.title}
+                    </h3>
+                    <p className="text-gray-700 text-xs sm:text-sm mb-4 line-clamp-3">
+                      {video.description}
+                    </p>
+                    <button className="text-lake-blue-700 font-semibold hover:text-lake-blue-800 text-sm sm:text-base py-2 min-h-[44px]">
+                      Watch Now →
+                    </button>
+                  </div>
+                </a>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -372,10 +435,17 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="bg-gradient-to-b from-lake-blue-900 to-lake-blue-950 text-white py-8 sm:py-12 px-4 sm:px-6 md:px-12">
-        <div className="max-w-6xl mx-auto text-center">
-          <p className="text-sm sm:text-base text-gray-300">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p className="text-sm sm:text-base text-gray-300 text-center sm:text-left">
             © 2024 Daily Dispo Deals. All rights reserved.
           </p>
+          <button
+            type="button"
+            onClick={() => setManagePrefsOpen(true)}
+            className="text-xs sm:text-sm text-gray-200 hover:text-white underline-offset-2 hover:underline"
+          >
+            Manage preferences
+          </button>
         </div>
       </footer>
 
@@ -383,6 +453,11 @@ export default function Home() {
         open={showPlanModal}
         onOpenChange={setShowPlanModal}
         initialEmail={email}
+      />
+
+      <ManagePreferencesModal
+        open={managePrefsOpen}
+        onOpenChange={setManagePrefsOpen}
       />
     </div>
   )

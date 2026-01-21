@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase/server'
 import { parseDealsFromText, type Deal } from '@/lib/ai-parser'
 import { calculateDealHash, validateDealQuality, flagForReview, type DealWithMetadata } from '@/lib/deal-quality'
 import { findOrCreateBrand, extractBrandFromTitle } from '@/lib/brand-extraction'
+import { rateLimit } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -16,12 +17,52 @@ const schema = z.object({
 })
 
 export async function POST(request: NextRequest) {
+  // Rate limiting - strict for AI parsing endpoints (expensive operations)
+  const rateLimitResult = await rateLimit(request, 'strict')
+  if (!rateLimitResult.success) {
+    return rateLimitResult.response
+  }
+
   try {
     const body = await request.json()
     const validated = schema.parse(body)
 
     // Get today's date
     const today = new Date().toISOString().split('T')[0]
+
+    // Short-circuit if OCR text is obviously too short/noisy to justify AI parsing
+    const trimmedText = validated.ocr_text.trim()
+    if (trimmedText.length < 50) {
+      // Create a simple summary entry instead of calling AI
+      const summaryEntry = {
+        dispensary_name: validated.dispensary_name,
+        city: validated.city || null,
+        date: today,
+        category: 'flower',
+        title: `${validated.dispensary_name} - Deal Flyer Available`,
+        price_text: 'See flyer for details',
+        source_url: validated.source_url || null,
+      }
+
+      const { error: insertError } = await supabaseAdmin
+        .from('deals')
+        .insert(summaryEntry)
+
+      if (insertError) {
+        console.error('Summary entry insert error (short OCR):', insertError)
+        return NextResponse.json(
+          { error: 'Failed to insert summary entry' },
+          { status: 500 }
+        )
+      }
+
+      return NextResponse.json({
+        deals_inserted: 1,
+        deals: [summaryEntry],
+        ai_skipped: true,
+        message: 'OCR text too short; skipped AI parsing and created summary entry',
+      })
+    }
 
     // Get source_url from deal_flyers if not provided
     let sourceUrl = validated.source_url || null
