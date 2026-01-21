@@ -3,6 +3,9 @@ import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { downloadFile, computeFileHash } from '@/lib/file-utils'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 const schema = z.object({
   dispensary_name: z.string().min(1),
   source_url: z.string().url(),

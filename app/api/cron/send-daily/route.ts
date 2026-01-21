@@ -4,6 +4,9 @@ import { supabaseAdmin } from '@/lib/supabase/server'
 import { resend } from '@/lib/resend'
 import { renderDailyDealsEmail } from '@/lib/email/render'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 export async function GET(request: NextRequest) {
   // Verify cron secret
   const headersList = await headers()

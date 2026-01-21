@@ -3,6 +3,9 @@ import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { parseDealsFromText } from '@/lib/ai-parser'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 const schema = z.object({
   ocr_text: z.string().min(10),
   dispensary_name: z.string().min(1),

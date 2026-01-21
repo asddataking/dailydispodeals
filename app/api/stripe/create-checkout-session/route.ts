@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { stripe } from '@/lib/stripe'
 
+// Mark route as dynamic to prevent static analysis during build
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 const schema = z.object({
   email: z.string().email(),
   plan: z.enum(['monthly', 'yearly']),

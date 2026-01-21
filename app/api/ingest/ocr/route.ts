@@ -4,6 +4,9 @@ import { supabaseAdmin } from '@/lib/supabase/server'
 import { extractTextFromImage } from '@/lib/ocr'
 import { PDFDocument } from 'pdf-lib'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 const schema = z.object({
   file_path: z.string().min(1),
 })

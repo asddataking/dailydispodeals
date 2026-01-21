@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/server'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 function parsePrice(priceText: string): number {
   // Try to extract numeric value from price text
   // Examples: "2/$35" -> 17.5, "1g $15" -> 15, "$25 each" -> 25

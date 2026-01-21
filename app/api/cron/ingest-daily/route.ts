@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 // Known dispensaries configuration
 // In production, this could be stored in a database
 const DISPENSARIES = [
