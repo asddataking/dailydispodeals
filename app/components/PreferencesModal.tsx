@@ -138,13 +138,13 @@ export function PreferencesModal({ open, onOpenChange, email }: PreferencesModal
       <Dialog.Root open={open} onOpenChange={onOpenChange}>
         <Dialog.Portal>
           <Dialog.Overlay className="modal-overlay" />
-          <Dialog.Content className="modal-content bg-white rounded-lg shadow-xl p-8 max-w-md w-full mx-4">
+          <Dialog.Content className="modal-content bg-white rounded-lg shadow-xl p-6 sm:p-8 max-w-md w-full mx-4">
             <div className="text-center">
-              <div className="text-green-600 text-4xl mb-4">✓</div>
-              <h2 className="text-2xl font-bold text-lake-blue-900 mb-2">
+              <div className="text-green-600 text-3xl sm:text-4xl mb-4">✓</div>
+              <h2 className="text-xl sm:text-2xl font-bold text-lake-blue-900 mb-2">
                 Preferences Saved!
               </h2>
-              <p className="text-gray-600">
+              <p className="text-sm sm:text-base text-gray-600">
                 You&apos;ll start receiving personalized deals daily.
               </p>
             </div>
@@ -154,37 +154,37 @@ export function PreferencesModal({ open, onOpenChange, email }: PreferencesModal
     )
   }
 
-  return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="modal-overlay" />
-        <Dialog.Content className="modal-content bg-white rounded-lg shadow-xl p-8 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
-          <Dialog.Title className="text-2xl font-bold text-lake-blue-900 mb-4">
-            Set Your Preferences
-          </Dialog.Title>
+      return (
+        <Dialog.Root open={open} onOpenChange={onOpenChange}>
+          <Dialog.Portal>
+            <Dialog.Overlay className="modal-overlay" />
+            <Dialog.Content className="modal-content bg-white rounded-lg shadow-xl p-4 sm:p-6 md:p-8 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+              <Dialog.Title className="text-xl sm:text-2xl font-bold text-lake-blue-900 mb-4">
+                Set Your Preferences
+              </Dialog.Title>
           
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">
-                Product Categories (select all that apply)
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {CATEGORIES.map(category => (
-                  <label
-                    key={category}
-                    className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedCategories.includes(category)}
-                      onChange={() => toggleCategory(category)}
-                      className="mr-2"
-                    />
-                    <span className="text-sm capitalize">{category.replace('/', ' / ')}</span>
+              <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Product Categories (select all that apply)
                   </label>
-                ))}
-              </div>
-            </div>
+                  <div className="grid grid-cols-2 gap-2 sm:gap-2">
+                    {CATEGORIES.map(category => (
+                      <label
+                        key={category}
+                        className="flex items-center p-2.5 sm:p-3 border rounded-lg cursor-pointer hover:bg-gray-50 min-h-[44px]"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedCategories.includes(category)}
+                          onChange={() => toggleCategory(category)}
+                          className="mr-2 w-4 h-4 sm:w-5 sm:h-5"
+                        />
+                        <span className="text-xs sm:text-sm capitalize">{category.replace('/', ' / ')}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-3">
@@ -216,56 +216,56 @@ export function PreferencesModal({ open, onOpenChange, email }: PreferencesModal
               )}
             </div>
 
-            <div>
-              <label htmlFor="zip" className="block text-sm font-medium text-gray-700 mb-2">
-                Zip Code (optional)
-              </label>
-              <input
-                id="zip"
-                type="text"
-                value={zip}
-                onChange={(e) => setZip(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-lake-blue-600 focus:border-transparent"
-                placeholder="48000"
-              />
-            </div>
+                <div>
+                  <label htmlFor="zip" className="block text-sm font-medium text-gray-700 mb-2">
+                    Zip Code (optional)
+                  </label>
+                  <input
+                    id="zip"
+                    type="text"
+                    value={zip}
+                    onChange={(e) => setZip(e.target.value)}
+                    className="w-full px-4 py-3 text-base border border-gray-300 rounded-md focus:ring-2 focus:ring-lake-blue-600 focus:border-transparent"
+                    placeholder="48000"
+                  />
+                </div>
 
-            {zip && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Search Radius (optional)
-                </label>
-                <select
-                  value={radius || ''}
-                  onChange={(e) => setRadius(e.target.value ? Number(e.target.value) as 5 | 10 | 25 : undefined)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-lake-blue-600 focus:border-transparent"
+                {zip && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Search Radius (optional)
+                    </label>
+                    <select
+                      value={radius || ''}
+                      onChange={(e) => setRadius(e.target.value ? Number(e.target.value) as 5 | 10 | 25 : undefined)}
+                      className="w-full px-4 py-3 text-base border border-gray-300 rounded-md focus:ring-2 focus:ring-lake-blue-600 focus:border-transparent"
+                    >
+                      <option value="">No radius limit</option>
+                      <option value="5">5 miles</option>
+                      <option value="10">10 miles</option>
+                      <option value="25">25 miles</option>
+                    </select>
+                  </div>
+                )}
+
+                {error && (
+                  <div className="text-red-600 text-sm">{error}</div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading || selectedCategories.length === 0}
+                  className="w-full bg-lake-blue-700 text-white py-3 rounded-md font-semibold hover:bg-lake-blue-800 disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px] text-base"
                 >
-                  <option value="">No radius limit</option>
-                  <option value="5">5 miles</option>
-                  <option value="10">10 miles</option>
-                  <option value="25">25 miles</option>
-                </select>
-              </div>
-            )}
-
-            {error && (
-              <div className="text-red-600 text-sm">{error}</div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading || selectedCategories.length === 0}
-              className="w-full bg-lake-blue-700 text-white py-3 rounded-md font-semibold hover:bg-lake-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Saving...' : 'Save Preferences'}
-            </button>
+                  {loading ? 'Saving...' : 'Save Preferences'}
+                </button>
           </form>
 
-          <Dialog.Close asChild>
-            <button className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
-              ✕
-            </button>
-          </Dialog.Close>
+              <Dialog.Close asChild>
+                <button className="absolute top-3 right-3 sm:top-4 sm:right-4 text-gray-400 hover:text-gray-600 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center">
+                  ✕
+                </button>
+              </Dialog.Close>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

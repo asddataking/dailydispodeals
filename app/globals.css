@@ -48,4 +48,14 @@ body {
 
 .modal-content {
   @apply fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50;
+  /* Mobile optimization */
+  @apply max-h-[90vh] overflow-y-auto;
+}
+
+/* Improve touch targets on mobile */
+@media (max-width: 640px) {
+  button, a, input[type="checkbox"], input[type="radio"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
 }

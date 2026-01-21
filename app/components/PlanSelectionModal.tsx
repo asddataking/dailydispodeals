@@ -47,12 +47,12 @@ export function PlanSelectionModal({ open, onOpenChange, initialEmail = '' }: Pl
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="modal-overlay" />
-        <Dialog.Content className="modal-content bg-white rounded-lg shadow-xl p-8 max-w-md w-full mx-4">
-          <Dialog.Title className="text-2xl font-bold text-lake-blue-900 mb-4">
+        <Dialog.Content className="modal-content bg-white rounded-lg shadow-xl p-4 sm:p-6 md:p-8 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+          <Dialog.Title className="text-xl sm:text-2xl font-bold text-lake-blue-900 mb-4">
             Choose Your Plan
           </Dialog.Title>
           
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
                 Email
@@ -63,7 +63,7 @@ export function PlanSelectionModal({ open, onOpenChange, initialEmail = '' }: Pl
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-lake-blue-600 focus:border-transparent"
+                className="w-full px-4 py-3 text-base border border-gray-300 rounded-md focus:ring-2 focus:ring-lake-blue-600 focus:border-transparent"
                 placeholder="your@email.com"
               />
             </div>
@@ -73,32 +73,32 @@ export function PlanSelectionModal({ open, onOpenChange, initialEmail = '' }: Pl
                 Select Plan
               </label>
               <div className="space-y-3">
-                <label className="flex items-center p-4 border-2 rounded-lg cursor-pointer hover:bg-gray-50">
+                <label className="flex items-center p-3 sm:p-4 border-2 rounded-lg cursor-pointer hover:bg-gray-50 min-h-[60px]">
                   <input
                     type="radio"
                     name="plan"
                     value="monthly"
                     checked={plan === 'monthly'}
                     onChange={() => setPlan('monthly')}
-                    className="mr-3"
+                    className="mr-3 w-5 h-5"
                   />
                   <div className="flex-1">
-                    <div className="font-semibold">Monthly</div>
-                    <div className="text-sm text-gray-600">$4.20/month</div>
+                    <div className="font-semibold text-sm sm:text-base">Monthly</div>
+                    <div className="text-xs sm:text-sm text-gray-600">$4.20/month</div>
                   </div>
                 </label>
-                <label className="flex items-center p-4 border-2 rounded-lg cursor-pointer hover:bg-gray-50">
+                <label className="flex items-center p-3 sm:p-4 border-2 rounded-lg cursor-pointer hover:bg-gray-50 min-h-[60px]">
                   <input
                     type="radio"
                     name="plan"
                     value="yearly"
                     checked={plan === 'yearly'}
                     onChange={() => setPlan('yearly')}
-                    className="mr-3"
+                    className="mr-3 w-5 h-5"
                   />
                   <div className="flex-1">
-                    <div className="font-semibold">Yearly</div>
-                    <div className="text-sm text-gray-600">$42/year (Save $8.40)</div>
+                    <div className="font-semibold text-sm sm:text-base">Yearly</div>
+                    <div className="text-xs sm:text-sm text-gray-600">$42/year (Save $8.40)</div>
                   </div>
                 </label>
               </div>
@@ -111,14 +111,14 @@ export function PlanSelectionModal({ open, onOpenChange, initialEmail = '' }: Pl
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-lake-blue-700 text-white py-3 rounded-md font-semibold hover:bg-lake-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-lake-blue-700 text-white py-3 rounded-md font-semibold hover:bg-lake-blue-800 disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px] text-base"
             >
               {loading ? 'Processing...' : 'Continue to Checkout'}
             </button>
           </form>
 
           <Dialog.Close asChild>
-            <button className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+            <button className="absolute top-3 right-3 sm:top-4 sm:right-4 text-gray-400 hover:text-gray-600 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center">
               ✕
             </button>
           </Dialog.Close>

@@ -28,16 +28,16 @@ function SuccessContent() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-lake-blue-900 to-lake-blue-700 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full text-center">
-        <div className="text-green-600 text-5xl mb-4">✓</div>
-        <h1 className="text-3xl font-bold text-lake-blue-900 mb-4">
+      <div className="bg-white rounded-lg shadow-xl p-6 sm:p-8 max-w-md w-full text-center">
+        <div className="text-green-600 text-4xl sm:text-5xl mb-4">✓</div>
+        <h1 className="text-2xl sm:text-3xl font-bold text-lake-blue-900 mb-4">
           Payment Successful!
         </h1>
-        <p className="text-gray-600 mb-6">
+        <p className="text-sm sm:text-base text-gray-600 mb-6">
           Welcome to Daily Dispo Deals. Let&apos;s set up your preferences to get you the best deals.
         </p>
         {loading && (
-          <div className="text-gray-500">Loading...</div>
+          <div className="text-gray-500 text-sm sm:text-base">Loading...</div>
         )}
       </div>
 
@@ -56,8 +56,8 @@ export default function SuccessPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-gradient-to-b from-lake-blue-900 to-lake-blue-700 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full text-center">
-          <div className="text-gray-500">Loading...</div>
+        <div className="bg-white rounded-lg shadow-xl p-6 sm:p-8 max-w-md w-full text-center">
+          <div className="text-sm sm:text-base text-gray-500">Loading...</div>
         </div>
       </div>
     }>
