@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabase/server'
-import { parseDealsFromText } from '@/lib/ai-parser'
+import { parseDealsFromText, type Deal } from '@/lib/ai-parser'
 import { calculateDealHash, validateDealQuality, flagForReview, type DealWithMetadata } from '@/lib/deal-quality'
 import { findOrCreateBrand, extractBrandFromTitle } from '@/lib/brand-extraction'
 
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
       sourceUrl = flyer?.source_url || null
     }
 
-    let deals: Array<{ category: string; title: string; price_text: string; confidence?: number }> = []
+    let deals: Deal[] = []
     let aiFailed = false
 
     try {
@@ -95,9 +95,9 @@ export async function POST(request: NextRequest) {
       const dealsToInsert: Array<{ deal: any; reviewReason?: string }> = []
       
       for (const deal of highConfidenceDeals) {
-        // Type assertion needed because spreading loses the enum type
+        // Construct DealWithMetadata with proper types
         const dealWithMetadata: DealWithMetadata = {
-          category: deal.category as DealWithMetadata['category'],
+          category: deal.category, // Already the correct enum type from Deal
           title: deal.title,
           brand: deal.brand,
           product_name: deal.product_name,
