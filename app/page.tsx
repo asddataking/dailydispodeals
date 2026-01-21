@@ -18,13 +18,8 @@ export default function Home() {
     <div className="min-h-screen bg-white">
       {/* Hero Section with Lake Background */}
       <section className="relative min-h-screen flex items-center px-6 md:px-12 py-20">
-        {/* Michigan Lake background - using Unsplash for beautiful lake imagery */}
-        <div 
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-100"
-          style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80')`
-          }}
-        ></div>
+        {/* Michigan Lake background - using local lake.jpg */}
+        <div className="absolute inset-0 bg-[url('/lake.jpg')] bg-cover bg-center bg-no-repeat opacity-100"></div>
         <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-white"></div>
 
         {/* Header */}
