@@ -13,7 +13,9 @@ function getSupabaseAdmin(): SupabaseClient {
   if (!supabaseUrl || !supabaseKey) {
     // During build, env vars might not be available, return a mock client
     // This will be replaced at runtime with actual env vars
-    if (process.env.NODE_ENV === 'production' && !supabaseUrl) {
+    // Only throw error in actual runtime production, not during build
+    const isBuildTime = !supabaseUrl && !supabaseKey
+    if (process.env.NODE_ENV === 'production' && !isBuildTime && !supabaseUrl) {
       throw new Error('SUPABASE_URL is required')
     }
     // Create a client with placeholder values for build-time analysis
