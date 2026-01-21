@@ -198,12 +198,13 @@ export async function GET(request: NextRequest) {
           // Website extraction (if available)
           dispensary.website ? (async () => {
             try {
+              const website = dispensary.website! // TypeScript: we know it's defined from the check above
               // Try common deals page paths
               const possibleUrls = [
-                dispensary.website.endsWith('/') ? dispensary.website + 'deals' : dispensary.website + '/deals',
-                dispensary.website.endsWith('/') ? dispensary.website + 'specials' : dispensary.website + '/specials',
-                dispensary.website.endsWith('/') ? dispensary.website + 'menu' : dispensary.website + '/menu',
-                dispensary.website, // Fallback to homepage
+                website.endsWith('/') ? website + 'deals' : website + '/deals',
+                website.endsWith('/') ? website + 'specials' : website + '/specials',
+                website.endsWith('/') ? website + 'menu' : website + '/menu',
+                website, // Fallback to homepage
               ]
 
               for (const url of possibleUrls) {
