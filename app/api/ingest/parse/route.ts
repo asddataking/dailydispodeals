@@ -95,8 +95,14 @@ export async function POST(request: NextRequest) {
       const dealsToInsert: Array<{ deal: any; reviewReason?: string }> = []
       
       for (const deal of highConfidenceDeals) {
+        // Type assertion needed because spreading loses the enum type
         const dealWithMetadata: DealWithMetadata = {
-          ...deal,
+          category: deal.category as DealWithMetadata['category'],
+          title: deal.title,
+          brand: deal.brand,
+          product_name: deal.product_name,
+          price_text: deal.price_text,
+          confidence: deal.confidence,
           dispensary_name: validated.dispensary_name,
           date: today,
           city: validated.city,
