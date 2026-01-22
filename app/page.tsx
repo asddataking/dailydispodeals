@@ -384,59 +384,24 @@ export default function Home() {
       </section>
 
       {/* Affiliate Deal Section */}
-      <section className="py-12 sm:py-16 md:py-20 px-4 sm:px-6 md:px-12 bg-gradient-to-b from-white to-lake-blue-50/30 relative overflow-hidden">
-        {/* Palm Tree Background Outlines */}
-        <div className="absolute inset-0 pointer-events-none opacity-[0.08]">
-          {/* Left side palm tree */}
-          <svg className="absolute left-0 bottom-0 w-64 h-96 text-amber-300" viewBox="0 0 200 300" fill="none" stroke="currentColor" strokeWidth="2.5">
-            {/* Trunk */}
-            <line x1="100" y1="300" x2="100" y2="200" strokeLinecap="round"/>
-            {/* Fronds - left side */}
-            <path d="M100 200 Q70 180 50 150 Q35 125 25 100 Q18 80 15 60 Q12 40 10 20" strokeLinecap="round"/>
-            <path d="M100 200 Q75 185 60 160 Q48 140 40 115 Q33 95 28 75 Q24 55 22 35" strokeLinecap="round"/>
-            <path d="M100 200 Q80 190 70 170 Q60 150 52 130 Q45 110 40 90 Q36 70 34 50" strokeLinecap="round"/>
-            {/* Fronds - right side */}
-            <path d="M100 200 Q130 180 150 150 Q165 125 175 100 Q182 80 185 60 Q188 40 190 20" strokeLinecap="round"/>
-            <path d="M100 200 Q125 185 140 160 Q152 140 160 115 Q167 95 172 75 Q176 55 178 35" strokeLinecap="round"/>
-            <path d="M100 200 Q120 190 130 170 Q140 150 148 130 Q155 110 160 90 Q164 70 166 50" strokeLinecap="round"/>
-            {/* Top fronds */}
-            <path d="M100 200 Q90 190 85 175 Q80 160 78 145" strokeLinecap="round"/>
-            <path d="M100 200 Q110 190 115 175 Q120 160 122 145" strokeLinecap="round"/>
-          </svg>
-          
-          {/* Right side palm tree */}
-          <svg className="absolute right-0 bottom-0 w-64 h-96 text-amber-300" viewBox="0 0 200 300" fill="none" stroke="currentColor" strokeWidth="2.5">
-            {/* Trunk */}
-            <line x1="100" y1="300" x2="100" y2="200" strokeLinecap="round"/>
-            {/* Fronds - left side */}
-            <path d="M100 200 Q70 180 50 150 Q35 125 25 100 Q18 80 15 60 Q12 40 10 20" strokeLinecap="round"/>
-            <path d="M100 200 Q75 185 60 160 Q48 140 40 115 Q33 95 28 75 Q24 55 22 35" strokeLinecap="round"/>
-            <path d="M100 200 Q80 190 70 170 Q60 150 52 130 Q45 110 40 90 Q36 70 34 50" strokeLinecap="round"/>
-            {/* Fronds - right side */}
-            <path d="M100 200 Q130 180 150 150 Q165 125 175 100 Q182 80 185 60 Q188 40 190 20" strokeLinecap="round"/>
-            <path d="M100 200 Q125 185 140 160 Q152 140 160 115 Q167 95 172 75 Q176 55 178 35" strokeLinecap="round"/>
-            <path d="M100 200 Q120 190 130 170 Q140 150 148 130 Q155 110 160 90 Q164 70 166 50" strokeLinecap="round"/>
-            {/* Top fronds */}
-            <path d="M100 200 Q90 190 85 175 Q80 160 78 145" strokeLinecap="round"/>
-            <path d="M100 200 Q110 190 115 175 Q120 160 122 145" strokeLinecap="round"/>
-          </svg>
-          
-          {/* Center background palm tree (smaller, more subtle) */}
-          <svg className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-72 text-amber-200" viewBox="0 0 150 220" fill="none" stroke="currentColor" strokeWidth="2">
-            {/* Trunk */}
-            <line x1="75" y1="220" x2="75" y2="150" strokeLinecap="round"/>
-            {/* Fronds */}
-            <path d="M75 150 Q55 135 40 110 Q28 90 20 70 Q14 55 12 40 Q10 25 9 15" strokeLinecap="round"/>
-            <path d="M75 150 Q60 140 50 120 Q42 105 36 85 Q31 70 28 55 Q26 40 25 30" strokeLinecap="round"/>
-            <path d="M75 150 Q95 135 110 110 Q122 90 130 70 Q136 55 138 40 Q140 25 141 15" strokeLinecap="round"/>
-            <path d="M75 150 Q90 140 100 120 Q108 105 114 85 Q119 70 122 55 Q124 40 125 30" strokeLinecap="round"/>
-            <path d="M75 150 Q70 145 68 130 Q66 115 65 100" strokeLinecap="round"/>
-            <path d="M75 150 Q80 145 82 130 Q84 115 85 100" strokeLinecap="round"/>
-          </svg>
+      <section className="py-12 sm:py-16 md:py-20 px-4 sm:px-6 md:px-12 relative overflow-hidden">
+        {/* Michigan Lake/Beach Background Image */}
+        <div className="absolute inset-0 z-0">
+          <Image
+            src="/michigan-beach.jpg"
+            alt="Michigan lake or beach background"
+            fill
+            quality={85}
+            className="object-cover"
+            sizes="100vw"
+            priority={false}
+          />
+          {/* Overlay for better text readability */}
+          <div className="absolute inset-0 bg-gradient-to-b from-white/85 via-white/75 to-white/85"></div>
         </div>
         
         <div className="max-w-6xl mx-auto relative z-10">
-          <div className="bg-white rounded-xl p-6 sm:p-8 md:p-12 shadow-xl border border-lake-blue-100">
+          <div className="bg-white/95 backdrop-blur-sm rounded-xl p-6 sm:p-8 md:p-12 shadow-xl border border-lake-blue-100/50">
             <div className="grid md:grid-cols-2 gap-6 sm:gap-8 items-center">
               <div>
                 <div className="text-xs sm:text-sm text-gray-500 mb-2 font-medium">AFFILIATE DEAL</div>
