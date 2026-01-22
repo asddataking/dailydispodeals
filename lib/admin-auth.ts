@@ -1,5 +1,5 @@
-import { getServerUser } from './supabase/server-auth'
 import { headers } from 'next/headers'
+import { createClient } from '@supabase/supabase-js'
 import { supabaseAdmin } from './supabase/server'
 
 /**
@@ -15,6 +15,67 @@ export function isAdmin(email: string): boolean {
  * Use this in API routes to verify admin access
  * Gets session from Supabase auth cookies or Authorization header
  */
+async function getServerUser(): Promise<{ email?: string } | null> {
+  try {
+    const headersList = await headers()
+    const cookieHeader = headersList.get('cookie')
+    
+    if (!cookieHeader) {
+      return null
+    }
+
+    // Try to extract access token from cookies
+    // Supabase stores tokens in various cookie formats
+    const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
+      const [key, value] = cookie.trim().split('=')
+      if (key && value) {
+        acc[key] = decodeURIComponent(value)
+      }
+      return acc
+    }, {} as Record<string, string>)
+
+    // Look for Supabase auth token in cookies
+    // Format can vary: sb-<project-ref>-auth-token or similar
+    let accessToken: string | undefined
+    
+    for (const [key, value] of Object.entries(cookies)) {
+      if (key.includes('auth-token') || key.includes('access-token')) {
+        // Try to parse as JSON (Supabase stores tokens as JSON)
+        try {
+          const parsed = JSON.parse(value)
+          accessToken = parsed?.access_token || parsed?.token || value
+        } catch {
+          accessToken = value
+        }
+        break
+      }
+    }
+    
+    if (!accessToken) {
+      return null
+    }
+
+    // Create a client to verify the token
+    const supabaseUrl = process.env.SUPABASE_URL
+    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY
+    
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return null
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseAnonKey)
+    const { data: { user }, error } = await supabase.auth.getUser(accessToken)
+    
+    if (error || !user) {
+      return null
+    }
+
+    return { email: user.email || undefined }
+  } catch (error) {
+    return null
+  }
+}
+
 export async function getAdminSession(): Promise<{ authenticated: boolean; email?: string }> {
   try {
     // First try: Get user from cookies (client-side requests)
