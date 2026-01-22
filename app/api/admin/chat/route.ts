@@ -120,8 +120,8 @@ export async function POST(request: NextRequest) {
     const tools = {
       add_dispensary: tool({
         description: 'Add a new dispensary to the system',
-        parameters: addDispensarySchema,
-        execute: async ({ name, city, zip, flyer_url, weedmaps_url }: z.infer<typeof addDispensarySchema>) => {
+        inputSchema: addDispensarySchema,
+        execute: async ({ name, city, zip, flyer_url, weedmaps_url }) => {
           try {
             // Geocode zip if provided
             let latitude: number | null = null
@@ -167,8 +167,8 @@ export async function POST(request: NextRequest) {
 
       update_dispensary: tool({
         description: 'Update an existing dispensary',
-        parameters: updateDispensarySchema,
-        execute: async ({ id, ...updates }: z.infer<typeof updateDispensarySchema>) => {
+        inputSchema: updateDispensarySchema,
+        execute: async ({ id, ...updates }) => {
           try {
             const updateData: Record<string, any> = {
               ...updates,
@@ -208,7 +208,7 @@ export async function POST(request: NextRequest) {
 
       get_dispensary_stats: tool({
         description: 'Get statistics for a specific dispensary',
-        parameters: z.object({
+        inputSchema: z.object({
           name: z.string().describe('Dispensary name'),
         }),
         execute: async ({ name }: { name: string }) => {
@@ -255,8 +255,8 @@ export async function POST(request: NextRequest) {
 
       review_deal: tool({
         description: 'Review a pending deal (approve, reject, or mark as fixed)',
-        parameters: reviewDealSchema,
-        execute: async ({ review_id, action, notes }: z.infer<typeof reviewDealSchema>) => {
+        inputSchema: reviewDealSchema,
+        execute: async ({ review_id, action, notes }) => {
           try {
             // Get the review
             const { data: review, error: reviewError } = await supabaseAdmin
@@ -345,7 +345,7 @@ export async function POST(request: NextRequest) {
 
       get_statistics: tool({
         description: 'Get app-wide statistics and metrics',
-        parameters: z.object({
+        inputSchema: z.object({
           days: z.number().optional().describe('Number of days to look back (default: 30)'),
         }),
         execute: async ({ days = 30 }: { days?: number }) => {
@@ -397,8 +397,8 @@ export async function POST(request: NextRequest) {
 
       get_ocr_status: tool({
         description: 'Check OCR and parsing status for a dispensary',
-        parameters: getOcrStatusSchema,
-        execute: async ({ dispensary_name, date }: z.infer<typeof getOcrStatusSchema>) => {
+        inputSchema: getOcrStatusSchema,
+        execute: async ({ dispensary_name, date }) => {
           try {
             const targetDate = date || new Date().toISOString().split('T')[0]
 
@@ -445,7 +445,7 @@ export async function POST(request: NextRequest) {
 
       get_ingestion_logs: tool({
         description: 'Get ingestion pipeline logs (flyers processed, deals extracted)',
-        parameters: z.object({
+        inputSchema: z.object({
           days: z.number().optional().describe('Number of days to look back (default: 7)'),
         }),
         execute: async ({ days = 7 }: { days?: number }) => {
