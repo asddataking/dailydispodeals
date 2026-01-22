@@ -1,7 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { getAdminSession } from '@/lib/admin-auth'
+import {
+  success,
+  unauthorized,
+  validationError,
+  notFound,
+  serverError,
+} from '@/lib/api-response'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -19,12 +26,9 @@ const reviewActionSchema = z.object({
  */
 export async function GET(request: NextRequest) {
   // Check admin session
-  const isAuthenticated = await getAdminSession()
-  if (!isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
-    )
+  const session = await getAdminSession()
+  if (!session.authenticated) {
+    return unauthorized()
   }
 
   try {
@@ -54,19 +58,13 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Error fetching reviews:', error)
-      return NextResponse.json(
-        { error: 'Failed to fetch reviews' },
-        { status: 500 }
-      )
+      return serverError('Failed to fetch reviews', error)
     }
 
-    return NextResponse.json({ reviews: reviews || [] })
+    return success({ reviews: reviews || [] })
   } catch (error) {
     console.error('Review API error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return serverError('Internal server error')
   }
 }
 
@@ -76,12 +74,9 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   // Check admin session
-  const isAuthenticated = await getAdminSession()
-  if (!isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
-    )
+  const session = await getAdminSession()
+  if (!session.authenticated) {
+    return unauthorized()
   }
 
   try {
@@ -97,10 +92,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (reviewError || !review) {
-      return NextResponse.json(
-        { error: 'Review not found or already processed' },
-        { status: 404 }
-      )
+      return notFound('Review not found or already processed')
     }
 
     const reviewedBy = validated.reviewed_by || process.env.ADMIN_EMAIL || 'system'
@@ -127,7 +119,7 @@ export async function POST(request: NextRequest) {
         })
         .eq('id', validated.review_id)
 
-      return NextResponse.json({ ok: true, action: 'approved' })
+      return success({ ok: true, action: 'approved' })
     } else if (validated.action === 'reject') {
       // Reject the deal - mark as reviewed but keep needs_review flag
       await supabaseAdmin
@@ -149,7 +141,7 @@ export async function POST(request: NextRequest) {
         })
         .eq('id', validated.review_id)
 
-      return NextResponse.json({ ok: true, action: 'rejected' })
+      return success({ ok: true, action: 'rejected' })
     } else if (validated.action === 'fix') {
       // Deal was fixed - remove review flag
       await supabaseAdmin
@@ -172,24 +164,15 @@ export async function POST(request: NextRequest) {
         })
         .eq('id', validated.review_id)
 
-      return NextResponse.json({ ok: true, action: 'fixed' })
+      return success({ ok: true, action: 'fixed' })
     }
 
-    return NextResponse.json(
-      { error: 'Invalid action' },
-      { status: 400 }
-    )
+    return validationError('Invalid action')
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Invalid input', details: error.errors },
-        { status: 400 }
-      )
+      return validationError('Invalid input', error.errors)
     }
     console.error('Review API error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return serverError('Internal server error')
   }
 }

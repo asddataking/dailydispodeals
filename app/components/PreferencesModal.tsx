@@ -102,9 +102,9 @@ export function PreferencesModal({ open, onOpenChange, email }: PreferencesModal
       } catch (edgeError) {
         // Fallback to API route
         console.warn('Edge function failed, using API route:', edgeError)
-        const response = await fetch('/api/preferences', {
+        const { apiFetch, getErrorMessage, isErrorResponse } = await import('@/lib/api-client')
+        const response = await apiFetch('/api/preferences', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             email,
             categories: selectedCategories,
@@ -113,13 +113,16 @@ export function PreferencesModal({ open, onOpenChange, email }: PreferencesModal
             radius: radius || undefined,
           }),
         })
-        data = await response.json()
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to save preferences')
+        
+        if (isErrorResponse(response)) {
+          throw new Error(getErrorMessage(response))
         }
+        
+        data = response.data
       }
 
-      if (!data.ok) {
+      // Check legacy format for edge function response
+      if (data && typeof data === 'object' && 'ok' in data && !data.ok) {
         throw new Error(data.error || 'Failed to save preferences')
       }
 

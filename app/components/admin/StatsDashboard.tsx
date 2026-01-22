@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase/client'
+import { SkeletonLoader } from '@/app/components/SkeletonLoader'
 
 interface Stats {
   users: { total: number }
@@ -24,18 +26,33 @@ export function StatsDashboard() {
 
   useEffect(() => {
     fetchStats()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [days])
 
   const fetchStats = async () => {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch(`/api/admin/stats?days=${days}`)
-      if (!res.ok) {
-        throw new Error('Failed to fetch stats')
+      // Get auth token
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+
+      const { apiFetch, getErrorMessage, isErrorResponse, unwrapApiResponse } = await import('@/lib/api-client')
+      const response = await apiFetch<Stats>(`/api/admin/stats?days=${days}`, {
+        headers: token
+          ? {
+              Authorization: `Bearer ${token}`,
+            }
+          : {},
+      })
+      
+      if (isErrorResponse(response)) {
+        throw new Error(getErrorMessage(response))
       }
-      const data = await res.json()
-      setStats(data)
+      
+      const responseData = unwrapApiResponse(response)
+      // API returns stats object directly in data
+      setStats(responseData as Stats)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load statistics')
     } finally {
@@ -44,7 +61,7 @@ export function StatsDashboard() {
   }
 
   if (loading) {
-    return <div className="text-gray-600">Loading statistics...</div>
+    return <SkeletonLoader variant="stats" />
   }
 
   if (error) {

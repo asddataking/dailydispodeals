@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { supabase } from '@/lib/supabase/client'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -38,9 +39,15 @@ export function GeminiChat() {
     setLoading(true)
 
     try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+
       const res = await fetch('/api/admin/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           messages: [...messages, userMessage].map((m) => ({
             role: m.role,
@@ -125,7 +132,7 @@ export function GeminiChat() {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask me anything about the app, analytics, or ask me to perform actions..."
+            placeholder="Ask me anything about the app, analytics, or ask me to perform actions&hellip;"
             className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-lake-blue-500 focus:border-transparent"
             disabled={loading}
           />
@@ -138,7 +145,7 @@ export function GeminiChat() {
           </button>
         </div>
         <div className="mt-2 text-xs text-gray-500">
-          Examples: "Add a dispensary called Green Leaf in Detroit", "How does OCR work?", "Show me today's statistics"
+          Examples: &quot;Add a dispensary called Green Leaf in Detroit&quot;, &quot;How does OCR work?&quot;, &quot;Show me today&apos;s statistics&quot;
         </div>
       </form>
     </div>

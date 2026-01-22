@@ -22,17 +22,17 @@ export function PlanSelectionModal({ open, onOpenChange, initialEmail = '' }: Pl
     setError(null)
 
     try {
-      const response = await fetch('/api/stripe/create-checkout-session', {
+      const { apiFetch, getErrorMessage, isErrorResponse, unwrapApiResponse } = await import('@/lib/api-client')
+      const response = await apiFetch<{ url: string }>('/api/stripe/create-checkout-session', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, plan }),
       })
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create checkout session')
+      if (isErrorResponse(response)) {
+        throw new Error(getErrorMessage(response))
       }
+
+      const data = unwrapApiResponse(response)
 
       // Redirect to Stripe Checkout
       if (data.url) {

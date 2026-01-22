@@ -11,8 +11,8 @@ export const runtime = 'nodejs'
  */
 export async function GET(request: NextRequest) {
   // Check admin session
-  const isAuthenticated = await getAdminSession()
-  if (!isAuthenticated) {
+  const session = await getAdminSession()
+  if (!session.authenticated) {
     return NextResponse.json(
       { error: 'Unauthorized' },
       { status: 401 }

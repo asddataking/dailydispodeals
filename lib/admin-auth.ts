@@ -1,54 +1,77 @@
-import { cookies } from 'next/headers'
-
-const ADMIN_SESSION_COOKIE = 'admin_session'
-const SESSION_DURATION = 24 * 60 * 60 * 1000 // 24 hours
+import { getServerUser } from './supabase/server-auth'
+import { headers } from 'next/headers'
+import { supabaseAdmin } from './supabase/server'
 
 /**
- * Verify admin API key against ADMIN_SECRET
+ * Check if an email is in the admin list
  */
-export function verifyAdminToken(token: string): boolean {
-  const adminSecret = process.env.ADMIN_SECRET
-  if (!adminSecret) {
-    console.error('ADMIN_SECRET is not configured')
+export function isAdmin(email: string): boolean {
+  const adminEmails = process.env.ADMIN_EMAILS?.split(',').map(e => e.trim()) || []
+  return adminEmails.includes(email)
+}
+
+/**
+ * Get admin session from request - checks Supabase auth and admin role
+ * Use this in API routes to verify admin access
+ * Gets session from Supabase auth cookies or Authorization header
+ */
+export async function getAdminSession(): Promise<{ authenticated: boolean; email?: string }> {
+  try {
+    // First try: Get user from cookies (client-side requests)
+    const user = await getServerUser()
+    
+    if (user && user.email && isAdmin(user.email)) {
+      return { authenticated: true, email: user.email }
+    }
+
+    // Fallback: Check Authorization header (for API calls with explicit token)
+    const headersList = await headers()
+    const authHeader = headersList.get('authorization')
+    
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7)
+      const { data: { user: authUser }, error } = await supabaseAdmin.auth.getUser(token)
+
+      if (!error && authUser && authUser.email && isAdmin(authUser.email)) {
+        return { authenticated: true, email: authUser.email }
+      }
+    }
+
+    return { authenticated: false }
+  } catch (error) {
+    console.error('Admin session check error:', error)
+    return { authenticated: false }
+  }
+}
+
+/**
+ * Verify admin access from email
+ */
+export async function verifyAdminAccess(email: string | null | undefined): Promise<boolean> {
+  if (!email) {
     return false
   }
-  return token === adminSecret
+  return isAdmin(email)
 }
 
 /**
- * Create admin session cookie
+ * Get admin user from client-side Supabase session
+ * Use this when you have a client-side Supabase instance
  */
-export async function createAdminSession(): Promise<void> {
-  const cookieStore = await cookies()
-  const expires = new Date(Date.now() + SESSION_DURATION)
-  
-  cookieStore.set(ADMIN_SESSION_COOKIE, 'authenticated', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    expires,
-    path: '/',
-  })
-}
+export async function getAdminUserFromClient(client: any): Promise<{ authenticated: boolean; email?: string }> {
+  try {
+    const { data: { user }, error } = await client.auth.getUser()
+    
+    if (error || !user || !user.email) {
+      return { authenticated: false }
+    }
 
-/**
- * Get and verify admin session
- */
-export async function getAdminSession(): Promise<boolean> {
-  const cookieStore = await cookies()
-  const session = cookieStore.get(ADMIN_SESSION_COOKIE)
-  
-  if (!session || session.value !== 'authenticated') {
-    return false
+    if (!isAdmin(user.email)) {
+      return { authenticated: false }
+    }
+
+    return { authenticated: true, email: user.email }
+  } catch (error) {
+    return { authenticated: false }
   }
-  
-  return true
-}
-
-/**
- * Clear admin session (logout)
- */
-export async function clearAdminSession(): Promise<void> {
-  const cookieStore = await cookies()
-  cookieStore.delete(ADMIN_SESSION_COOKIE)
 }

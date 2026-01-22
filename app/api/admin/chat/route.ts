@@ -1,10 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { getAdminSession } from '@/lib/admin-auth'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { generateText, tool } from 'ai'
 import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { geocodeZip } from '@/lib/geocoding'
+import {
+  success,
+  unauthorized,
+  validationError,
+  serverError,
+} from '@/lib/api-response'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -86,12 +92,9 @@ const getOcrStatusSchema = z.object({
  */
 export async function POST(request: NextRequest) {
   // Check admin session
-  const isAuthenticated = await getAdminSession()
-  if (!isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
-    )
+  const session = await getAdminSession()
+  if (!session.authenticated) {
+    return unauthorized()
   }
 
   try {
@@ -99,18 +102,12 @@ export async function POST(request: NextRequest) {
     const { messages } = body
 
     if (!messages || !Array.isArray(messages)) {
-      return NextResponse.json(
-        { error: 'Messages array required' },
-        { status: 400 }
-      )
+      return validationError('Messages array required')
     }
 
     const geminiApiKey = process.env.GEMINI_API_KEY
     if (!geminiApiKey) {
-      return NextResponse.json(
-        { error: 'GEMINI_API_KEY not configured' },
-        { status: 500 }
-      )
+      return serverError('GEMINI_API_KEY not configured')
     }
 
     const google = createGoogleGenerativeAI({
@@ -488,16 +485,13 @@ export async function POST(request: NextRequest) {
       maxSteps: 5, // Allow multiple function calls in one turn
     })
 
-    return NextResponse.json({
+    return success({
       text: result.text,
       toolCalls: result.toolCalls,
       toolResults: result.toolResults,
     })
   } catch (error) {
     console.error('Chat API error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
-      { status: 500 }
-    )
+    return serverError(error instanceof Error ? error.message : 'Internal server error')
   }
 }

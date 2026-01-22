@@ -1,8 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { getDispensariesNearZip } from '@/lib/dispensary-discovery'
 import { rateLimit } from '@/lib/rate-limit'
+import {
+  success,
+  validationError,
+  serverError,
+  rateLimitError,
+} from '@/lib/api-response'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -19,7 +25,7 @@ export async function POST(request: NextRequest) {
   // Rate limiting - moderate for preferences endpoint
   const rateLimitResult = await rateLimit(request, 'moderate')
   if (!rateLimitResult.success) {
-    return rateLimitResult.response
+    return rateLimitError('Too many requests. Please try again later.')
   }
 
   try {
@@ -34,10 +40,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (userError || !user) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 400 }
-      )
+      return validationError('User not found')
     }
 
     // Check user has active subscription
@@ -50,10 +53,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (!subscription) {
-      return NextResponse.json(
-        { error: 'No active subscription found' },
-        { status: 400 }
-      )
+      return validationError('No active subscription found')
     }
 
     // Upsert preferences
@@ -72,10 +72,7 @@ export async function POST(request: NextRequest) {
 
     if (prefError) {
       console.error('Preferences upsert error:', prefError)
-      return NextResponse.json(
-        { error: 'Failed to save preferences' },
-        { status: 500 }
-      )
+      return serverError('Failed to save preferences', prefError)
     }
 
     // If zip and radius provided, discover dispensaries in that area
@@ -92,18 +89,12 @@ export async function POST(request: NextRequest) {
         })
     }
 
-    return NextResponse.json({ ok: true })
+    return success({ ok: true })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Invalid input', details: error.errors },
-        { status: 400 }
-      )
+      return validationError('Invalid input', error.errors)
     }
     console.error('Preferences API error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return serverError('Internal server error')
   }
 }

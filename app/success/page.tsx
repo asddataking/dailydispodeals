@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { PreferencesModal } from '@/app/components/PreferencesModal'
 import { supabase } from '@/lib/supabase/client'
+import { SkeletonLoader } from '@/app/components/SkeletonLoader'
 
 function SuccessContent() {
   const searchParams = useSearchParams()
@@ -37,10 +38,17 @@ function SuccessContent() {
         }
 
         // Get email from Stripe session
-        const sessionResponse = await fetch(`/api/stripe/get-session?session_id=${sessionId}`)
-        const sessionData = await sessionResponse.json()
+        const { apiFetch, getErrorMessage, isErrorResponse, unwrapApiResponse } = await import('@/lib/api-client')
+        const sessionResponse = await apiFetch<{ email: string }>(`/api/stripe/get-session?session_id=${sessionId}`)
         
-        if (!sessionResponse.ok || !sessionData.email) {
+        if (isErrorResponse(sessionResponse)) {
+          setError('Could not verify your session. Please contact support.')
+          setLoading(false)
+          return
+        }
+        
+        const sessionData = unwrapApiResponse(sessionResponse)
+        if (!sessionData.email) {
           setError('Could not verify your session. Please contact support.')
           setLoading(false)
           return
@@ -109,7 +117,10 @@ function SuccessContent() {
           Welcome to Daily Dispo Deals. Let&apos;s set up your preferences to get you the best deals.
         </p>
         {loading && (
-          <div className="text-gray-500 text-sm sm:text-base">Loading your session...</div>
+          <div className="space-y-3">
+            <SkeletonLoader variant="text" width="200px" height="20px" className="mx-auto" />
+            <SkeletonLoader variant="text" width="150px" height="16px" className="mx-auto" />
+          </div>
         )}
         {error && (
           <div className="text-red-600 text-sm sm:text-base mt-4">
@@ -137,7 +148,7 @@ export default function SuccessPage() {
     <Suspense fallback={
       <div className="min-h-screen bg-gradient-to-b from-lake-blue-900 to-lake-blue-700 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg shadow-xl p-6 sm:p-8 max-w-md w-full text-center">
-          <div className="text-sm sm:text-base text-gray-500">Loading...</div>
+          <SkeletonLoader variant="text" width="100px" height="20px" className="mx-auto" />
         </div>
       </div>
     }>

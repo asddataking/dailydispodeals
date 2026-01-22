@@ -1,8 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { stripe } from '@/lib/stripe'
 import { rateLimit } from '@/lib/rate-limit'
 import { getOrCreateAuthUser } from '@/lib/auth-helpers'
+import {
+  success,
+  validationError,
+  serverError,
+  rateLimitError,
+} from '@/lib/api-response'
 
 // Mark route as dynamic to prevent static analysis during build
 export const dynamic = 'force-dynamic'
@@ -17,7 +23,7 @@ export async function POST(request: NextRequest) {
   // Rate limiting - strict for payment endpoints
   const rateLimitResult = await rateLimit(request, 'strict')
   if (!rateLimitResult.success) {
-    return rateLimitResult.response
+    return rateLimitError('Too many requests. Please try again later.')
   }
 
   try {
@@ -49,10 +55,7 @@ export async function POST(request: NextRequest) {
       : process.env.STRIPE_YEARLY_PRICE_ID!
 
     if (!priceId) {
-      return NextResponse.json(
-        { error: 'Price ID not configured' },
-        { status: 500 }
-      )
+      return serverError('Price ID not configured')
     }
 
     // Create checkout session with auth_user_id in metadata
@@ -73,18 +76,12 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    return NextResponse.json({ url: session.url })
+    return success({ url: session.url })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Invalid input', details: error.errors },
-        { status: 400 }
-      )
+      return validationError('Invalid input', error.errors)
     }
     console.error('Stripe checkout error:', error)
-    return NextResponse.json(
-      { error: 'Failed to create checkout session' },
-      { status: 500 }
-    )
+    return serverError('Failed to create checkout session')
   }
 }

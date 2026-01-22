@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase/client'
+import { SkeletonLoader } from '@/app/components/SkeletonLoader'
 
 interface EmailLog {
   id: string
@@ -32,17 +34,30 @@ export function LogsViewer() {
 
   useEffect(() => {
     fetchLogs()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [type, days])
 
   const fetchLogs = async () => {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch(`/api/admin/logs?type=${type}&days=${days}`)
-      if (!res.ok) {
-        throw new Error('Failed to fetch logs')
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+
+      const { apiFetch, getErrorMessage, isErrorResponse, unwrapApiResponse } = await import('@/lib/api-client')
+      const response = await apiFetch<{ email_logs: EmailLog[]; ingestion_logs: IngestionLog[] }>(`/api/admin/logs?type=${type}&days=${days}`, {
+        headers: token
+          ? {
+              Authorization: `Bearer ${token}`,
+            }
+          : {},
+      })
+      
+      if (isErrorResponse(response)) {
+        throw new Error(getErrorMessage(response))
       }
-      const data = await res.json()
+      
+      const data = unwrapApiResponse(response)
       setEmailLogs(data.email_logs || [])
       setIngestionLogs(data.ingestion_logs || [])
     } catch (err) {
@@ -53,7 +68,18 @@ export function LogsViewer() {
   }
 
   if (loading) {
-    return <div className="text-gray-600">Loading logs...</div>
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <SkeletonLoader variant="text" width="100px" height="32px" />
+          <div className="flex gap-4">
+            <SkeletonLoader variant="text" width="120px" height="40px" />
+            <SkeletonLoader variant="text" width="120px" height="40px" />
+          </div>
+        </div>
+        <SkeletonLoader variant="table" count={5} />
+      </div>
+    )
   }
 
   if (error) {

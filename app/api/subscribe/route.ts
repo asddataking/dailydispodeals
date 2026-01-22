@@ -1,6 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabase/server'
+import {
+  success,
+  validationError,
+  serverError,
+} from '@/lib/api-response'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -128,22 +133,16 @@ export async function POST(request: NextRequest) {
       .lt('next_process_at', new Date().toISOString())
       .or('next_process_at.is.null')
 
-    return NextResponse.json({
+    return success({
       ok: true,
       zoneZip: normalizedZip,
       alreadySubscribed,
     })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Invalid input', details: error.errors },
-        { status: 400 }
-      )
+      return validationError('Invalid input', error.errors)
     }
     console.error('Subscribe API error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return serverError('Internal server error')
   }
 }

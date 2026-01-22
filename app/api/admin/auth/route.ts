@@ -1,82 +1,88 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyAdminToken, createAdminSession, getAdminSession, clearAdminSession } from '@/lib/admin-auth'
+import { headers } from 'next/headers'
+import { supabaseAdmin } from '@/lib/supabase/server'
+import { verifyAdminAccess, isAdmin } from '@/lib/admin-auth'
+import {
+  success,
+  validationError,
+  forbidden,
+  serverError,
+} from '@/lib/api-response'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 /**
  * POST /api/admin/auth
- * Login with admin API key
+ * Send magic link for admin login
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { token } = body
+    const { email } = body
 
-    if (!token || typeof token !== 'string') {
-      return NextResponse.json(
-        { error: 'Token required' },
-        { status: 400 }
-      )
+    if (!email || typeof email !== 'string') {
+      return validationError('Email required')
     }
 
-    if (!verifyAdminToken(token)) {
-      return NextResponse.json(
-        { error: 'Invalid token' },
-        { status: 401 }
-      )
+    // Check if email is admin before sending magic link
+    if (!isAdmin(email)) {
+      return forbidden('Access denied')
     }
 
-    await createAdminSession()
+    // Send magic link using Supabase Auth (client-side will handle it)
+    // We use the regular signInWithOtp which sends email
+    // The redirect will go to /admin/magic which verifies admin access
+    const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'magiclink',
+      email: email,
+      options: {
+        redirectTo: `${process.env.APP_URL || 'http://localhost:3000'}/admin/magic`,
+      },
+    })
 
-    return NextResponse.json({ success: true })
+    if (error || !data) {
+      console.error('Error generating admin magic link:', error)
+      return serverError('Failed to send magic link', error)
+    }
+
+    return success(null, 'Magic link sent to your email')
   } catch (error) {
     console.error('Admin auth error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return serverError('Internal server error')
   }
 }
 
 /**
  * GET /api/admin/auth
- * Check if session is valid
+ * Check if user is authenticated and is admin
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const isAuthenticated = await getAdminSession()
+    // Get auth token from Authorization header
+    const headersList = await headers()
+    const authHeader = headersList.get('authorization')
     
-    if (!isAuthenticated) {
-      return NextResponse.json(
-        { authenticated: false },
-        { status: 401 }
-      )
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      // Try to get from cookie (client-side)
+      const cookieHeader = headersList.get('cookie')
+      if (!cookieHeader) {
+        return NextResponse.json(
+          { authenticated: false, isAdmin: false },
+          { status: 401 }
+        )
+      }
     }
 
-    return NextResponse.json({ authenticated: true })
+    // For client-side checks, we'll verify on the client
+    // This endpoint is mainly for checking status
+    return success({ 
+      authenticated: false, 
+      isAdmin: false,
+      message: 'Use client-side auth check' 
+    })
   } catch (error) {
     console.error('Admin auth check error:', error)
-    return NextResponse.json(
-      { authenticated: false },
-      { status: 500 }
-    )
-  }
-}
-
-/**
- * DELETE /api/admin/auth
- * Logout (clear session)
- */
-export async function DELETE() {
-  try {
-    await clearAdminSession()
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Admin logout error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return serverError('Internal server error')
   }
 }

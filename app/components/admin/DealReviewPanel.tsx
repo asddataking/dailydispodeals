@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase/client'
+import { SkeletonLoader } from '@/app/components/SkeletonLoader'
 
 interface Review {
   id: string
@@ -35,11 +37,23 @@ export function DealReviewPanel() {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('/api/admin/deals/review')
-      if (!res.ok) {
-        throw new Error('Failed to fetch reviews')
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+
+      const { apiFetch, getErrorMessage, isErrorResponse, unwrapApiResponse } = await import('@/lib/api-client')
+      const response = await apiFetch<{ reviews: Review[] }>('/api/admin/deals/review', {
+        headers: token
+          ? {
+              Authorization: `Bearer ${token}`,
+            }
+          : {},
+      })
+      
+      if (isErrorResponse(response)) {
+        throw new Error(getErrorMessage(response))
       }
-      const data = await res.json()
+      
+      const data = unwrapApiResponse(response)
       setReviews(data.reviews || [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load reviews')
@@ -50,9 +64,15 @@ export function DealReviewPanel() {
 
   const handleReview = async (reviewId: string, action: 'approve' | 'reject' | 'fix', notes?: string) => {
     try {
-      const res = await fetch('/api/admin/deals/review', {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+
+      const { apiFetch, getErrorMessage, isErrorResponse } = await import('@/lib/api-client')
+      const response = await apiFetch('/api/admin/deals/review', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           review_id: reviewId,
           action,
@@ -60,8 +80,8 @@ export function DealReviewPanel() {
         }),
       })
 
-      if (!res.ok) {
-        throw new Error('Failed to process review')
+      if (isErrorResponse(response)) {
+        throw new Error(getErrorMessage(response))
       }
 
       // Remove from list
@@ -72,7 +92,7 @@ export function DealReviewPanel() {
   }
 
   if (loading) {
-    return <div className="text-gray-600">Loading reviews...</div>
+    return <SkeletonLoader variant="review" count={3} />
   }
 
   if (error) {

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { rateLimit } from '@/lib/rate-limit'
 import {
@@ -6,6 +6,13 @@ import {
   addDistancesToDeals,
   rankDealsWithDistance,
 } from '@/lib/zone-deals'
+import {
+  success,
+  validationError,
+  notFound,
+  serverError,
+  rateLimitError,
+} from '@/lib/api-response'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -44,7 +51,7 @@ export async function GET(request: NextRequest) {
   // Rate limiting - moderate for deals endpoint
   const rateLimitResult = await rateLimit(request, 'moderate')
   if (!rateLimitResult.success) {
-    return rateLimitResult.response
+    return rateLimitError('Too many requests. Please try again later.')
   }
 
   try {
@@ -54,17 +61,11 @@ export async function GET(request: NextRequest) {
 
     // Validate inputs
     if (!email || !email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
-      return NextResponse.json(
-        { error: 'Valid email is required' },
-        { status: 400 }
-      )
+      return validationError('Valid email is required')
     }
 
     if (!date || !date.match(/^\d{4}-\d{2}-\d{2}$/)) {
-      return NextResponse.json(
-        { error: 'Valid date (YYYY-MM-DD) is required' },
-        { status: 400 }
-      )
+      return validationError('Valid date (YYYY-MM-DD) is required')
     }
 
     // Load user by email
@@ -75,10 +76,7 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (userError || !user) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
+      return notFound('User not found')
     }
 
     // Load user preferences
@@ -89,7 +87,7 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (!preferences || !preferences.categories || preferences.categories.length === 0) {
-      return NextResponse.json({ deals: [] })
+      return success({ deals: [] })
     }
 
     // Filter out stale deals (older than 2 days from requested date)
@@ -127,7 +125,7 @@ export async function GET(request: NextRequest) {
       } else {
         // User has brand preferences but no matching brands found
         // Return empty (or could return all deals - depends on UX preference)
-        return NextResponse.json({ deals: [] })
+        return success({ deals: [] })
       }
     }
 
@@ -137,21 +135,18 @@ export async function GET(request: NextRequest) {
       query = query.in('dispensary_name', dispensariesInZones)
     } else {
       // User has no zones subscribed, return empty
-      return NextResponse.json({ deals: [] })
+      return success({ deals: [] })
     }
 
     const { data: deals, error: dealsError } = await query
 
     if (dealsError) {
       console.error('Deals query error:', dealsError)
-      return NextResponse.json(
-        { error: 'Failed to fetch deals' },
-        { status: 500 }
-      )
+      return serverError('Failed to fetch deals', dealsError)
     }
 
     if (!deals || deals.length === 0) {
-      return NextResponse.json({ deals: [] })
+      return success({ deals: [] })
     }
 
     // Add distances for ranking (if user has ZIP)
@@ -185,12 +180,9 @@ export async function GET(request: NextRequest) {
     // Remove score and distance from response (distance is only used for ranking)
     const result = scoredDeals.map(({ score, distance, ...deal }) => deal)
 
-    return NextResponse.json({ deals: result })
+    return success({ deals: result })
   } catch (error) {
     console.error('Deals API error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return serverError('Internal server error')
   }
 }

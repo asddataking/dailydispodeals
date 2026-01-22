@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase/client'
+import { SkeletonLoader } from '@/app/components/SkeletonLoader'
 
 interface Dispensary {
   id: string
@@ -22,6 +24,10 @@ export function DispensaryManager() {
   const [error, setError] = useState('')
   const [showAddModal, setShowAddModal] = useState(false)
   const [editing, setEditing] = useState<Dispensary | null>(null)
+  const [discoverZip, setDiscoverZip] = useState('')
+  const [discoverRadius, setDiscoverRadius] = useState<5 | 10 | 25>(25)
+  const [discovering, setDiscovering] = useState(false)
+  const [discoverResult, setDiscoverResult] = useState<{ success: boolean; discovered: number; message?: string } | null>(null)
 
   useEffect(() => {
     fetchDispensaries()
@@ -31,11 +37,23 @@ export function DispensaryManager() {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('/api/admin/dispensaries')
-      if (!res.ok) {
-        throw new Error('Failed to fetch dispensaries')
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+
+      const { apiFetch, getErrorMessage, isErrorResponse, unwrapApiResponse } = await import('@/lib/api-client')
+      const response = await apiFetch<{ dispensaries: Dispensary[] }>('/api/admin/dispensaries', {
+        headers: token
+          ? {
+              Authorization: `Bearer ${token}`,
+            }
+          : {},
+      })
+      
+      if (isErrorResponse(response)) {
+        throw new Error(getErrorMessage(response))
       }
-      const data = await res.json()
+      
+      const data = unwrapApiResponse(response)
       setDispensaries(data.dispensaries || [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load dispensaries')
@@ -50,12 +68,21 @@ export function DispensaryManager() {
     }
 
     try {
-      const res = await fetch(`/api/admin/dispensaries?id=${id}`, {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+
+      const { apiFetch, getErrorMessage, isErrorResponse } = await import('@/lib/api-client')
+      const response = await apiFetch(`/api/admin/dispensaries?id=${id}`, {
         method: 'DELETE',
+        headers: token
+          ? {
+              Authorization: `Bearer ${token}`,
+            }
+          : {},
       })
 
-      if (!res.ok) {
-        throw new Error('Failed to deactivate dispensary')
+      if (isErrorResponse(response)) {
+        throw new Error(getErrorMessage(response))
       }
 
       fetchDispensaries()
@@ -64,8 +91,74 @@ export function DispensaryManager() {
     }
   }
 
+  const handleDiscover = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!discoverZip || discoverZip.length !== 5) {
+      setDiscoverResult({ success: false, discovered: 0, message: 'Please enter a valid 5-digit ZIP code' })
+      return
+    }
+
+    setDiscovering(true)
+    setDiscoverResult(null)
+    setError('')
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+
+      const { apiFetch, getErrorMessage, isErrorResponse, unwrapApiResponse } = await import('@/lib/api-client')
+      const response = await apiFetch<{ discovered: number }>('/api/admin/discover', {
+        method: 'POST',
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          zip: discoverZip,
+          radius: discoverRadius,
+        }),
+      })
+
+      if (isErrorResponse(response)) {
+        throw new Error(getErrorMessage(response))
+      }
+
+      const data = unwrapApiResponse(response)
+
+      setDiscoverResult({
+        success: true,
+        discovered: data.discovered || 0,
+        message: `Discovered ${data.discovered} dispensaries near ${discoverZip}`,
+      })
+
+      // Refresh dispensaries list
+      fetchDispensaries()
+
+      // Clear form after a delay
+      setTimeout(() => {
+        setDiscoverZip('')
+        setDiscoverResult(null)
+      }, 3000)
+    } catch (err) {
+      setDiscoverResult({
+        success: false,
+        discovered: 0,
+        message: err instanceof Error ? err.message : 'Failed to discover dispensaries',
+      })
+    } finally {
+      setDiscovering(false)
+    }
+  }
+
   if (loading) {
-    return <div className="text-gray-600">Loading dispensaries...</div>
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <SkeletonLoader variant="text" width="200px" height="32px" />
+          <SkeletonLoader variant="text" width="150px" height="40px" />
+        </div>
+        <SkeletonLoader variant="table" count={5} />
+      </div>
+    )
   }
 
   if (error) {
@@ -82,6 +175,68 @@ export function DispensaryManager() {
         >
           Add Dispensary
         </button>
+      </div>
+
+      {/* Discovery Section */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Discover Dispensaries</h3>
+        <form onSubmit={handleDiscover} className="space-y-4">
+          <div className="flex gap-4 items-end">
+            <div className="flex-1">
+              <label htmlFor="discoverZip" className="block text-sm font-medium text-gray-700 mb-2">
+                ZIP Code
+              </label>
+              <input
+                id="discoverZip"
+                type="text"
+                value={discoverZip}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, '').slice(0, 5)
+                  setDiscoverZip(value)
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                placeholder="48201"
+                maxLength={5}
+                required
+                disabled={discovering}
+              />
+            </div>
+            <div className="w-32">
+              <label htmlFor="discoverRadius" className="block text-sm font-medium text-gray-700 mb-2">
+                Radius (miles)
+              </label>
+              <select
+                id="discoverRadius"
+                value={discoverRadius}
+                onChange={(e) => setDiscoverRadius(Number(e.target.value) as 5 | 10 | 25)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                disabled={discovering}
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+              </select>
+            </div>
+            <button
+              type="submit"
+              disabled={discovering || !discoverZip || discoverZip.length !== 5}
+              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {discovering ? 'Discovering...' : 'Discover'}
+            </button>
+          </div>
+          {discoverResult && (
+            <div
+              className={`p-3 rounded-lg ${
+                discoverResult.success
+                  ? 'bg-green-50 text-green-800'
+                  : 'bg-red-50 text-red-800'
+              }`}
+            >
+              {discoverResult.message}
+            </div>
+          )}
+        </form>
       </div>
 
       {showAddModal && (
@@ -198,9 +353,15 @@ function AddDispensaryModal({ onClose }: { onClose: () => void }) {
     setSubmitting(true)
 
     try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+
       const res = await fetch('/api/admin/dispensaries', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           name: formData.name,
           city: formData.city || undefined,
@@ -313,9 +474,15 @@ function EditDispensaryModal({ dispensary, onClose }: { dispensary: Dispensary; 
     setSubmitting(true)
 
     try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+
       const res = await fetch('/api/admin/dispensaries', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           id: dispensary.id,
           ...formData,

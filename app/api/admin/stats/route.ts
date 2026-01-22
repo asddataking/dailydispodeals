@@ -1,6 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { getAdminSession } from '@/lib/admin-auth'
 import { supabaseAdmin } from '@/lib/supabase/server'
+import { headers } from 'next/headers'
+import {
+  success,
+  unauthorized,
+  serverError,
+} from '@/lib/api-response'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -11,12 +17,9 @@ export const runtime = 'nodejs'
  */
 export async function GET(request: NextRequest) {
   // Check admin session
-  const isAuthenticated = await getAdminSession()
-  if (!isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
-    )
+  const session = await getAdminSession()
+  if (!session.authenticated) {
+    return unauthorized()
   }
 
   try {
@@ -103,7 +106,7 @@ export async function GET(request: NextRequest) {
     const totalFlyersProcessed = flyers?.length || 0
     const totalDealsExtracted = flyers?.reduce((sum, f) => sum + (f.deals_extracted || 0), 0) || 0
 
-    return NextResponse.json({
+    return success({
       users: {
         total: totalUsers || 0,
       },
@@ -143,9 +146,6 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('Stats API error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return serverError('Internal server error')
   }
 }

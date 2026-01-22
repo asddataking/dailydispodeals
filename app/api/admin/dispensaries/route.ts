@@ -1,8 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { geocodeZip } from '@/lib/geocoding'
 import { getAdminSession } from '@/lib/admin-auth'
+import {
+  success,
+  unauthorized,
+  validationError,
+  notFound,
+  serverError,
+} from '@/lib/api-response'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -27,12 +34,9 @@ const updateDispensarySchema = dispensarySchema.partial().extend({
  */
 export async function GET(request: NextRequest) {
   // Check admin session
-  const isAuthenticated = await getAdminSession()
-  if (!isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
-    )
+  const session = await getAdminSession()
+  if (!session.authenticated) {
+    return unauthorized()
   }
 
   try {
@@ -43,10 +47,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Error fetching dispensaries:', error)
-      return NextResponse.json(
-        { error: 'Failed to fetch dispensaries' },
-        { status: 500 }
-      )
+      return serverError('Failed to fetch dispensaries', error)
     }
 
     // Get stats for each dispensary
@@ -65,13 +66,10 @@ export async function GET(request: NextRequest) {
       })
     )
 
-    return NextResponse.json({ dispensaries: dispensariesWithStats })
+    return success({ dispensaries: dispensariesWithStats })
   } catch (error) {
     console.error('Dispensaries API error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return serverError('Internal server error')
   }
 }
 
@@ -81,12 +79,9 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   // Check admin session
-  const isAuthenticated = await getAdminSession()
-  if (!isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
-    )
+  const session = await getAdminSession()
+  if (!session.authenticated) {
+    return unauthorized()
   }
 
   try {
@@ -124,31 +119,19 @@ export async function POST(request: NextRequest) {
     if (error) {
       // Check if it's a duplicate
       if (error.code === '23505') {
-        return NextResponse.json(
-          { error: 'Dispensary with this name already exists' },
-          { status: 409 }
-        )
+        return validationError('Dispensary with this name already exists')
       }
       console.error('Error adding dispensary:', error)
-      return NextResponse.json(
-        { error: 'Failed to add dispensary' },
-        { status: 500 }
-      )
+      return serverError('Failed to add dispensary', error)
     }
 
-    return NextResponse.json({ dispensary: data })
+    return success({ dispensary: data })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Invalid input', details: error.errors },
-        { status: 400 }
-      )
+      return validationError('Invalid input', error.errors)
     }
     console.error('Dispensaries API error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return serverError('Internal server error')
   }
 }
 
@@ -158,12 +141,9 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   // Check admin session
-  const isAuthenticated = await getAdminSession()
-  if (!isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
-    )
+  const session = await getAdminSession()
+  if (!session.authenticated) {
+    return unauthorized()
   }
 
   try {
@@ -196,32 +176,20 @@ export async function PUT(request: NextRequest) {
 
     if (error) {
       console.error('Error updating dispensary:', error)
-      return NextResponse.json(
-        { error: 'Failed to update dispensary' },
-        { status: 500 }
-      )
+      return serverError('Failed to update dispensary', error)
     }
 
     if (!data) {
-      return NextResponse.json(
-        { error: 'Dispensary not found' },
-        { status: 404 }
-      )
+      return notFound('Dispensary not found')
     }
 
-    return NextResponse.json({ dispensary: data })
+    return success({ dispensary: data })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Invalid input', details: error.errors },
-        { status: 400 }
-      )
+      return validationError('Invalid input', error.errors)
     }
     console.error('Dispensaries API error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return serverError('Internal server error')
   }
 }
 
@@ -231,12 +199,9 @@ export async function PUT(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   // Check admin session
-  const isAuthenticated = await getAdminSession()
-  if (!isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
-    )
+  const session = await getAdminSession()
+  if (!session.authenticated) {
+    return unauthorized()
   }
 
   try {
@@ -244,10 +209,7 @@ export async function DELETE(request: NextRequest) {
     const id = searchParams.get('id')
 
     if (!id) {
-      return NextResponse.json(
-        { error: 'Dispensary ID required' },
-        { status: 400 }
-      )
+      return validationError('Dispensary ID required')
     }
 
     const { data, error } = await supabaseAdmin
@@ -262,25 +224,16 @@ export async function DELETE(request: NextRequest) {
 
     if (error) {
       console.error('Error deactivating dispensary:', error)
-      return NextResponse.json(
-        { error: 'Failed to deactivate dispensary' },
-        { status: 500 }
-      )
+      return serverError('Failed to deactivate dispensary', error)
     }
 
     if (!data) {
-      return NextResponse.json(
-        { error: 'Dispensary not found' },
-        { status: 404 }
-      )
+      return notFound('Dispensary not found')
     }
 
-    return NextResponse.json({ dispensary: data })
+    return success({ dispensary: data })
   } catch (error) {
     console.error('Dispensaries API error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return serverError('Internal server error')
   }
 }

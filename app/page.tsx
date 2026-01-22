@@ -1,11 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 import { motion } from 'framer-motion'
 import { PlanSelectionModal } from './components/PlanSelectionModal'
 import { StructuredData } from './components/StructuredData'
 import { FAQ } from './components/FAQ'
 import { ManagePreferencesModal } from './components/ManagePreferencesModal'
+import { SkeletonLoader } from './components/SkeletonLoader'
 
 export default function Home() {
   const [email, setEmail] = useState('')
@@ -85,12 +87,22 @@ export default function Home() {
       <StructuredData data={structuredData} />
       {/* Hero Section with Lake Background */}
       <section className="relative min-h-screen flex items-center px-4 sm:px-6 md:px-12 py-16 sm:py-20">
-        {/* Michigan Lake background - using local lake.jpg */}
-        <div className="absolute inset-0 bg-[url('/lake.jpg')] bg-cover bg-center bg-no-repeat opacity-100"></div>
-        <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-white"></div>
+        {/* Michigan Lake background - optimized WebP image */}
+        <div className="absolute inset-0 z-0">
+          <Image
+            src="/lake.webp"
+            alt="Michigan lake landscape background"
+            fill
+            priority
+            quality={90}
+            className="object-cover"
+            sizes="100vw"
+          />
+        </div>
+        <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-white z-[1]"></div>
 
         {/* Header */}
-        <header className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-4 sm:px-6 md:px-12 py-4 md:py-6">
+        <header className="absolute top-0 left-0 right-0 z-[2] flex items-center justify-between px-4 sm:px-6 md:px-12 py-4 md:py-6">
           <div className="flex items-center">
             <span className="text-white font-bold text-lg sm:text-xl drop-shadow-lg">DAILY DISPO DEALS</span>
           </div>
@@ -462,20 +474,7 @@ export default function Home() {
 
           {videosLoading && (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-              {[0, 1, 2].map((i) => (
-                <div
-                  key={i}
-                  className="bg-white rounded-xl overflow-hidden shadow-lg border border-lake-blue-100 animate-pulse"
-                >
-                  <div className="h-48 sm:h-64 bg-lake-blue-100" />
-                  <div className="p-4 sm:p-6 space-y-3">
-                    <div className="h-4 bg-gray-200 rounded w-24" />
-                    <div className="h-5 bg-gray-200 rounded w-3/4" />
-                    <div className="h-4 bg-gray-200 rounded w-full" />
-                    <div className="h-10 bg-gray-200 rounded w-32" />
-                  </div>
-                </div>
-              ))}
+              <SkeletonLoader variant="video" count={3} />
             </div>
           )}
 
