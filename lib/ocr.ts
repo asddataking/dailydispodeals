@@ -18,11 +18,11 @@ export async function extractTextFromImage(
   imageBuffer: Buffer,
   mimeType: string
 ): Promise<{ text: string; confidence?: number }> {
-  // Prefer direct Gemini API key, fallback to Vercel AI Gateway
+  // Prefer Vercel AI Gateway (for rate limit protection), fallback to direct Gemini API
   const geminiApiKey = process.env.GEMINI_API_KEY
   const gatewayApiKey = process.env.AI_GATEWAY_API_KEY
-  const apiKey = geminiApiKey || gatewayApiKey
-  const baseURL = geminiApiKey ? undefined : (process.env.AI_GATEWAY_URL || 'https://gateway.vercel.ai/v1')
+  const apiKey = gatewayApiKey || geminiApiKey
+  const baseURL = gatewayApiKey ? (process.env.AI_GATEWAY_URL || 'https://gateway.vercel.ai/v1') : undefined
 
   // Prefer Gemini (direct or via Vercel AI Gateway) when configured
   if (apiKey) {

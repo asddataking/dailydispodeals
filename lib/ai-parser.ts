@@ -27,26 +27,27 @@ export async function parseDealsFromText(
   dispensaryName: string,
   city?: string
 ): Promise<Deal[]> {
-  // Prefer direct Gemini API key, fallback to Vercel AI Gateway
+  // Prefer Vercel AI Gateway (for rate limit protection), fallback to direct Gemini API
   const geminiApiKey = process.env.GEMINI_API_KEY
   const gatewayApiKey = process.env.AI_GATEWAY_API_KEY
   
-  // Determine which provider to use (defaults to Google/Gemini if GEMINI_API_KEY is set, otherwise OpenAI)
-  const provider = process.env.AI_MODEL_PROVIDER || (geminiApiKey ? 'google' : 'openai')
+  // Determine which provider to use (defaults to Google/Gemini if either key is set, otherwise OpenAI)
+  const provider = process.env.AI_MODEL_PROVIDER || (geminiApiKey || gatewayApiKey ? 'google' : 'openai')
   const aiGatewayUrl = process.env.AI_GATEWAY_URL || 'https://gateway.vercel.ai/v1'
 
   let model: any
 
   if (provider === 'google') {
     // Use Google Gemini Flash (much cheaper: ~50% cost savings)
-    const apiKey = geminiApiKey || gatewayApiKey
+    // Prefer gateway for rate limit protection when both keys are available
+    const apiKey = gatewayApiKey || geminiApiKey
     if (!apiKey) {
       throw new Error('GEMINI_API_KEY or AI_GATEWAY_API_KEY is required for Google provider')
     }
     
     const google = createGoogleGenerativeAI({
       apiKey,
-      ...(geminiApiKey ? {} : { baseURL: aiGatewayUrl }), // Only use baseURL for gateway, not direct API
+      ...(gatewayApiKey ? { baseURL: aiGatewayUrl } : {}), // Use baseURL when gateway key is set
     })
     // Gemini 1.5 Flash model
     model = google('gemini-1.5-flash')

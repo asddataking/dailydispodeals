@@ -105,13 +105,20 @@ export async function POST(request: NextRequest) {
       return validationError('Messages array required')
     }
 
+    // Prefer Vercel AI Gateway (for rate limit protection), fallback to direct Gemini API
     const geminiApiKey = process.env.GEMINI_API_KEY
-    if (!geminiApiKey) {
-      return serverError('GEMINI_API_KEY not configured')
+    const gatewayApiKey = process.env.AI_GATEWAY_API_KEY
+    const apiKey = gatewayApiKey || geminiApiKey
+    
+    if (!apiKey) {
+      return serverError('GEMINI_API_KEY or AI_GATEWAY_API_KEY is required')
     }
 
+    const baseURL = gatewayApiKey ? (process.env.AI_GATEWAY_URL || 'https://gateway.vercel.ai/v1') : undefined
+
     const google = createGoogleGenerativeAI({
-      apiKey: geminiApiKey,
+      apiKey,
+      ...(baseURL && { baseURL }), // Only use baseURL for gateway, not direct API
     })
 
     const model = google('gemini-1.5-flash')
