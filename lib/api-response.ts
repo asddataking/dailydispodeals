@@ -49,8 +49,8 @@ export function error(
     {
       success: false,
       error: message,
-      ...(code && { code }),
-      ...(details && { details }),
+      ...(code ? { code } : {}),
+      ...(details != null ? { details } : {}),
     },
     { status }
   )
