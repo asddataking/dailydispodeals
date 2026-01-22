@@ -125,9 +125,12 @@ export async function GET(request: NextRequest) {
       emails: {
         sent: emailsSent || 0,
         failed: emailsFailed || 0,
-        success_rate: emailsSent && emailsSent + emailsFailed
-          ? ((emailsSent / (emailsSent + emailsFailed)) * 100).toFixed(1)
-          : '0',
+        success_rate: (() => {
+          const sent = emailsSent || 0
+          const failed = emailsFailed || 0
+          const total = sent + failed
+          return total > 0 ? ((sent / total) * 100).toFixed(1) : '0'
+        })(),
       },
       reviews: {
         pending: pendingReviews || 0,
