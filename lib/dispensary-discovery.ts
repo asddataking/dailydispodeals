@@ -197,7 +197,7 @@ export async function addDispensary(
 export async function getDispensariesNearZip(
   zip: string,
   radiusMiles: number
-): Promise<Array<{ id: string; name: string; city?: string; flyer_url?: string }>> {
+): Promise<Array<{ id: string; name: string; city?: string; zip?: string; flyer_url?: string; weedmaps_url?: string }>> {
   const zipLocation = await geocodeZip(zip)
   
   if (!zipLocation) {
@@ -207,7 +207,7 @@ export async function getDispensariesNearZip(
   // Get all active dispensaries
   const { data: dispensaries, error } = await supabaseAdmin
     .from('dispensaries')
-    .select('id, name, city, latitude, longitude, flyer_url')
+    .select('id, name, city, zip, latitude, longitude, flyer_url, weedmaps_url')
     .eq('active', true)
 
   if (error || !dispensaries) {
@@ -231,7 +231,9 @@ export async function getDispensariesNearZip(
       id: d.id,
       name: d.name,
       city: d.city,
+      zip: d.zip,
       flyer_url: d.flyer_url,
+      weedmaps_url: d.weedmaps_url,
     }))
 
   return nearby
