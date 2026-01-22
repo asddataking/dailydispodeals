@@ -489,7 +489,8 @@ export async function POST(request: NextRequest) {
         content: msg.content,
       })),
       tools,
-      maxSteps: 5, // Allow multiple function calls in one turn
+      // Note: maxSteps/maxToolRoundtrips may not be available in all AI SDK versions
+      // Tools will still work, but may require multiple turns for complex operations
     })
 
     return success({
