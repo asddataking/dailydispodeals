@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAdminAuth, getAuthHeaders } from '@/lib/hooks/useAdminAuth'
 import { SkeletonLoader } from '@/app/components/SkeletonLoader'
 
@@ -30,13 +30,7 @@ export function DealReviewPanel() {
   const [error, setError] = useState('')
   const { token } = useAdminAuth()
 
-  useEffect(() => {
-    if (token !== null) {
-      fetchReviews()
-    }
-  }, [token])
-
-  const fetchReviews = async () => {
+  const fetchReviews = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
@@ -56,7 +50,13 @@ export function DealReviewPanel() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [token])
+
+  useEffect(() => {
+    if (token !== null) {
+      fetchReviews()
+    }
+  }, [token, fetchReviews])
 
   const handleReview = async (reviewId: string, action: 'approve' | 'reject' | 'fix', notes?: string) => {
     try {

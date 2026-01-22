@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAdminAuth, getAuthHeaders } from '@/lib/hooks/useAdminAuth'
 import { SkeletonLoader } from '@/app/components/SkeletonLoader'
 
@@ -30,13 +30,7 @@ export function DispensaryManager() {
   const [discoverResult, setDiscoverResult] = useState<{ success: boolean; discovered: number; message?: string } | null>(null)
   const { token } = useAdminAuth()
 
-  useEffect(() => {
-    if (token !== null) {
-      fetchDispensaries()
-    }
-  }, [token])
-
-  const fetchDispensaries = async () => {
+  const fetchDispensaries = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
@@ -56,7 +50,13 @@ export function DispensaryManager() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [token])
+
+  useEffect(() => {
+    if (token !== null) {
+      fetchDispensaries()
+    }
+  }, [token, fetchDispensaries])
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to deactivate this dispensary?')) {

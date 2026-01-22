@@ -121,7 +121,8 @@ export async function POST(request: NextRequest) {
       add_dispensary: tool({
         description: 'Add a new dispensary to the system',
         parameters: addDispensarySchema,
-        execute: async ({ name, city, zip, flyer_url, weedmaps_url }) => {
+        execute: async (args: z.infer<typeof addDispensarySchema>) => {
+          const { name, city, zip, flyer_url, weedmaps_url } = args
           try {
             // Geocode zip if provided
             let latitude: number | null = null
@@ -168,8 +169,8 @@ export async function POST(request: NextRequest) {
       update_dispensary: tool({
         description: 'Update an existing dispensary',
         parameters: updateDispensarySchema,
-        execute: async (args) => {
-          const { id, ...updates } = args as z.infer<typeof updateDispensarySchema>
+        execute: async (args: z.infer<typeof updateDispensarySchema>) => {
+          const { id, ...updates } = args
           try {
             const updateData: Record<string, any> = {
               ...updates,
@@ -212,7 +213,8 @@ export async function POST(request: NextRequest) {
         parameters: z.object({
           name: z.string().describe('Dispensary name'),
         }),
-        execute: async ({ name }) => {
+        execute: async (args: { name: string }) => {
+          const { name } = args
           try {
             const { data: dispensary } = await supabaseAdmin
               .from('dispensaries')
@@ -257,7 +259,8 @@ export async function POST(request: NextRequest) {
       review_deal: tool({
         description: 'Review a pending deal (approve, reject, or mark as fixed)',
         parameters: reviewDealSchema,
-        execute: async ({ review_id, action, notes }) => {
+        execute: async (args: z.infer<typeof reviewDealSchema>) => {
+          const { review_id, action, notes } = args
           try {
             // Get the review
             const { data: review, error: reviewError } = await supabaseAdmin
@@ -349,7 +352,8 @@ export async function POST(request: NextRequest) {
         parameters: z.object({
           days: z.number().optional().describe('Number of days to look back (default: 30)'),
         }),
-        execute: async ({ days = 30 }) => {
+        execute: async (args: { days?: number }) => {
+          const days = args.days ?? 30
           try {
             const startDate = new Date()
             startDate.setDate(startDate.getDate() - days)
@@ -399,8 +403,8 @@ export async function POST(request: NextRequest) {
       get_ocr_status: tool({
         description: 'Check OCR and parsing status for a dispensary',
         parameters: getOcrStatusSchema,
-        execute: async (args) => {
-          const { dispensary_name, date } = args as z.infer<typeof getOcrStatusSchema>
+        execute: async (args: z.infer<typeof getOcrStatusSchema>) => {
+          const { dispensary_name, date } = args
           try {
             const targetDate = date || new Date().toISOString().split('T')[0]
 
@@ -450,7 +454,8 @@ export async function POST(request: NextRequest) {
         parameters: z.object({
           days: z.number().optional().describe('Number of days to look back (default: 7)'),
         }),
-        execute: async ({ days = 7 }) => {
+        execute: async (args: { days?: number }) => {
+          const days = args.days ?? 7
           try {
             const startDate = new Date()
             startDate.setDate(startDate.getDate() - days)
