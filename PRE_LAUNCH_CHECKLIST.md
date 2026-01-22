@@ -19,6 +19,7 @@ The success page currently tries to get email from URL params, but Stripe checko
 - Option B: Store email in session/cookie before checkout
 - Option C: Fetch email from Stripe session on success page
 
+
 **Recommendation:** Option C - Fetch from Stripe session using session_id
 
 ### 2. Vercel Cron Jobs Configuration

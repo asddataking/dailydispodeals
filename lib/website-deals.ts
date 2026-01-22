@@ -30,18 +30,21 @@ export async function extractDealsFromWebsite(
   dispensaryName: string,
   city?: string
 ): Promise<WebsiteDeal[]> {
-  const apiKey = process.env.AI_GATEWAY_API_KEY
+  // Prefer direct Gemini API key, fallback to Vercel AI Gateway
+  const geminiApiKey = process.env.GEMINI_API_KEY
+  const gatewayApiKey = process.env.AI_GATEWAY_API_KEY
+  const apiKey = geminiApiKey || gatewayApiKey
+  
   if (!apiKey) {
-    throw new Error('AI_GATEWAY_API_KEY is not configured')
+    throw new Error('GEMINI_API_KEY or AI_GATEWAY_API_KEY is required')
   }
 
-  const baseURL = process.env.AI_GATEWAY_URL || 'https://gateway.vercel.ai/v1'
-  const provider = process.env.AI_MODEL_PROVIDER || 'google'
+  const baseURL = geminiApiKey ? undefined : (process.env.AI_GATEWAY_URL || 'https://gateway.vercel.ai/v1')
 
   // Use Gemini Flash for cost efficiency
   const google = createGoogleGenerativeAI({
     apiKey,
-    baseURL,
+    ...(baseURL && { baseURL }), // Only use baseURL for gateway, not direct API
   })
 
   const model = google('gemini-1.5-flash')

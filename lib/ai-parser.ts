@@ -27,28 +27,36 @@ export async function parseDealsFromText(
   dispensaryName: string,
   city?: string
 ): Promise<Deal[]> {
-  if (!process.env.AI_GATEWAY_API_KEY) {
-    throw new Error('AI_GATEWAY_API_KEY is not configured')
-  }
-
-  // Determine which provider to use (defaults to OpenAI, set AI_MODEL_PROVIDER=google for Gemini)
-  const provider = process.env.AI_MODEL_PROVIDER || 'openai'
+  // Prefer direct Gemini API key, fallback to Vercel AI Gateway
+  const geminiApiKey = process.env.GEMINI_API_KEY
+  const gatewayApiKey = process.env.AI_GATEWAY_API_KEY
+  
+  // Determine which provider to use (defaults to Google/Gemini if GEMINI_API_KEY is set, otherwise OpenAI)
+  const provider = process.env.AI_MODEL_PROVIDER || (geminiApiKey ? 'google' : 'openai')
   const aiGatewayUrl = process.env.AI_GATEWAY_URL || 'https://gateway.vercel.ai/v1'
 
   let model: any
 
   if (provider === 'google') {
     // Use Google Gemini Flash (much cheaper: ~50% cost savings)
+    const apiKey = geminiApiKey || gatewayApiKey
+    if (!apiKey) {
+      throw new Error('GEMINI_API_KEY or AI_GATEWAY_API_KEY is required for Google provider')
+    }
+    
     const google = createGoogleGenerativeAI({
-      apiKey: process.env.AI_GATEWAY_API_KEY,
-      baseURL: aiGatewayUrl,
+      apiKey,
+      ...(geminiApiKey ? {} : { baseURL: aiGatewayUrl }), // Only use baseURL for gateway, not direct API
     })
     // Gemini 1.5 Flash model
     model = google('gemini-1.5-flash')
   } else {
     // Use OpenAI GPT-4o-mini (default)
+    if (!gatewayApiKey) {
+      throw new Error('AI_GATEWAY_API_KEY is required for OpenAI provider')
+    }
     const openai = createOpenAI({
-      apiKey: process.env.AI_GATEWAY_API_KEY,
+      apiKey: gatewayApiKey,
       baseURL: aiGatewayUrl,
     })
     model = openai('gpt-4o-mini')

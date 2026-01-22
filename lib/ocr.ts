@@ -18,15 +18,18 @@ export async function extractTextFromImage(
   imageBuffer: Buffer,
   mimeType: string
 ): Promise<{ text: string; confidence?: number }> {
-  const apiKey = process.env.AI_GATEWAY_API_KEY
-  const baseURL = process.env.AI_GATEWAY_URL || 'https://gateway.vercel.ai/v1'
+  // Prefer direct Gemini API key, fallback to Vercel AI Gateway
+  const geminiApiKey = process.env.GEMINI_API_KEY
+  const gatewayApiKey = process.env.AI_GATEWAY_API_KEY
+  const apiKey = geminiApiKey || gatewayApiKey
+  const baseURL = geminiApiKey ? undefined : (process.env.AI_GATEWAY_URL || 'https://gateway.vercel.ai/v1')
 
-  // Prefer Gemini via Vercel AI Gateway when configured
+  // Prefer Gemini (direct or via Vercel AI Gateway) when configured
   if (apiKey) {
     try {
       const google = createGoogleGenerativeAI({
         apiKey,
-        baseURL,
+        ...(baseURL && { baseURL }),
       })
 
       // Use a vision-capable, cost-efficient Gemini model
@@ -62,7 +65,7 @@ export async function extractTextFromImage(
 
   // Fallback: OpenAI Vision API if configured
   if (!openai) {
-    throw new Error('No OCR provider configured: set AI_GATEWAY_API_KEY for Gemini or OPENAI_API_KEY for OpenAI.')
+    throw new Error('No OCR provider configured: set GEMINI_API_KEY (direct) or AI_GATEWAY_API_KEY (via gateway) for Gemini, or OPENAI_API_KEY for OpenAI.')
   }
 
   try {

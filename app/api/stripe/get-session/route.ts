@@ -26,20 +26,18 @@ export async function GET(request: NextRequest) {
     // Retrieve session from Stripe
     const session = await stripe.checkout.sessions.retrieve(sessionId)
 
-    if (!session.customer) {
-      return NextResponse.json(
-        { error: 'No customer found in session' },
-        { status: 404 }
-      )
-    }
+    // Try to get email directly from session first (customer_email is set in create-checkout-session)
+    let email = session.customer_email
 
-    // Get customer email
-    const customer = await stripe.customers.retrieve(session.customer as string)
-    const email = typeof customer === 'object' && !customer.deleted ? customer.email : null
+    // Fallback: get email from customer object if not in session
+    if (!email && session.customer) {
+      const customer = await stripe.customers.retrieve(session.customer as string)
+      email = typeof customer === 'object' && !customer.deleted ? customer.email : null
+    }
 
     if (!email) {
       return NextResponse.json(
-        { error: 'No email found for customer' },
+        { error: 'No email found in session' },
         { status: 404 }
       )
     }
