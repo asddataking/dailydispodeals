@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { stripe } from '@/lib/stripe'
 import { rateLimit } from '@/lib/rate-limit'
+import { getOrCreateAuthUser } from '@/lib/auth-helpers'
 
 // Mark route as dynamic to prevent static analysis during build
 export const dynamic = 'force-dynamic'
@@ -22,6 +23,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const validated = schema.parse(body)
+
+    // Create/get Supabase Auth user silently (before Stripe checkout)
+    const authUserId = await getOrCreateAuthUser(validated.email)
 
     // Find or create Stripe customer by email
     const customers = await stripe.customers.list({
@@ -51,7 +55,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create checkout session
+    // Create checkout session with auth_user_id in metadata
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
@@ -64,6 +68,9 @@ export async function POST(request: NextRequest) {
       success_url: `${process.env.APP_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.APP_URL}/?canceled=1`,
       customer_email: validated.email,
+      metadata: {
+        auth_user_id: authUserId,
+      },
     })
 
     return NextResponse.json({ url: session.url })

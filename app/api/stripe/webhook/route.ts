@@ -58,10 +58,24 @@ export async function POST(request: NextRequest) {
       const priceId = subscription.items.data[0]?.price.id
       const plan = priceId === process.env.STRIPE_MONTHLY_PRICE_ID ? 'monthly' : 'yearly'
 
-      // Upsert user
+      // Get auth_user_id from session metadata (created in create-checkout-session)
+      const authUserId = session.metadata?.auth_user_id
+
+      if (!authUserId) {
+        console.error('No auth_user_id in session metadata')
+        return NextResponse.json({ received: true })
+      }
+
+      // Upsert user with auth_user_id as the primary key
       const { data: user, error: userError } = await supabaseAdmin
         .from('users')
-        .upsert({ email }, { onConflict: 'email' })
+        .upsert(
+          {
+            id: authUserId,
+            email,
+          },
+          { onConflict: 'id' }
+        )
         .select('id')
         .single()
 

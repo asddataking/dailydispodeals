@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { PreferencesModal } from '@/app/components/PreferencesModal'
+import { supabase } from '@/lib/supabase/client'
 
 function SuccessContent() {
   const searchParams = useSearchParams()
@@ -13,41 +14,88 @@ function SuccessContent() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const fetchEmail = async () => {
-      if (!sessionId) {
-        setError('Missing session ID')
-        setLoading(false)
-        return
-      }
-
+    const checkAuth = async () => {
       try {
-        // Fetch email from Stripe session
-        const response = await fetch(`/api/stripe/get-session?session_id=${sessionId}`)
-        const data = await response.json()
+        // First, check if user is already authenticated
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
         
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to fetch session')
-        }
-
-        if (data.email) {
-          setEmail(data.email)
-          // Small delay for better UX
+        if (!authError && user && user.email) {
+          // User is authenticated, use their email
+          setEmail(user.email)
           setTimeout(() => {
             setShowModal(true)
             setLoading(false)
           }, 500)
-        } else {
-          setError('Email not found in session')
-          setLoading(false)
+          return
         }
+
+        // Not authenticated - get email from Stripe session and sign in
+        if (!sessionId) {
+          setError('Missing session ID')
+          setLoading(false)
+          return
+        }
+
+        // Get email from Stripe session
+        const sessionResponse = await fetch(`/api/stripe/get-session?session_id=${sessionId}`)
+        const sessionData = await sessionResponse.json()
+        
+        if (!sessionResponse.ok || !sessionData.email) {
+          setError('Could not verify your session. Please contact support.')
+          setLoading(false)
+          return
+        }
+
+        // Create Supabase Auth session for this user
+        try {
+          const authResponse = await fetch('/api/auth/create-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: sessionData.email }),
+          })
+
+          if (authResponse.ok) {
+            const { token } = await authResponse.json()
+            
+            if (token) {
+              // Sign in using the token
+              const { error: signInError } = await supabase.auth.verifyOtp({
+                token_hash: token,
+                type: 'magiclink',
+              })
+
+              if (!signInError) {
+                // Now authenticated, get user email
+                const { data: { user: authUser } } = await supabase.auth.getUser()
+                if (authUser?.email) {
+                  setEmail(authUser.email)
+                  setTimeout(() => {
+                    setShowModal(true)
+                    setLoading(false)
+                  }, 500)
+                  return
+                }
+              }
+            }
+          }
+        } catch (authErr) {
+          console.warn('Failed to create auth session, using email directly:', authErr)
+        }
+
+        // Fallback: use email from Stripe session directly (preferences will still save)
+        setEmail(sessionData.email)
+        setTimeout(() => {
+          setShowModal(true)
+          setLoading(false)
+        }, 500)
       } catch (err) {
-        console.error('Error fetching session:', err)
+        console.error('Error checking auth:', err)
         setError(err instanceof Error ? err.message : 'Failed to load session')
         setLoading(false)
       }
     }
 
-    fetchEmail()
+    checkAuth()
   }, [sessionId])
 
   return (

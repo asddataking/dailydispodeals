@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { geocodeZip } from '@/lib/geocoding'
+import { getAdminSession } from '@/lib/admin-auth'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -25,6 +26,15 @@ const updateDispensarySchema = dispensarySchema.partial().extend({
  * List all dispensaries with stats
  */
 export async function GET(request: NextRequest) {
+  // Check admin session
+  const isAuthenticated = await getAdminSession()
+  if (!isAuthenticated) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401 }
+    )
+  }
+
   try {
     const { data: dispensaries, error } = await supabaseAdmin
       .from('dispensaries')
@@ -70,6 +80,15 @@ export async function GET(request: NextRequest) {
  * Add a new dispensary
  */
 export async function POST(request: NextRequest) {
+  // Check admin session
+  const isAuthenticated = await getAdminSession()
+  if (!isAuthenticated) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401 }
+    )
+  }
+
   try {
     const body = await request.json()
     const validated = dispensarySchema.parse(body)
@@ -138,6 +157,15 @@ export async function POST(request: NextRequest) {
  * Update an existing dispensary
  */
 export async function PUT(request: NextRequest) {
+  // Check admin session
+  const isAuthenticated = await getAdminSession()
+  if (!isAuthenticated) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401 }
+    )
+  }
+
   try {
     const body = await request.json()
     const validated = updateDispensarySchema.parse(body)
@@ -202,6 +230,15 @@ export async function PUT(request: NextRequest) {
  * Deactivate a dispensary (soft delete)
  */
 export async function DELETE(request: NextRequest) {
+  // Check admin session
+  const isAuthenticated = await getAdminSession()
+  if (!isAuthenticated) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401 }
+    )
+  }
+
   try {
     const searchParams = request.nextUrl.searchParams
     const id = searchParams.get('id')

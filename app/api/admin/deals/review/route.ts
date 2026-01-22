@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabase/server'
+import { getAdminSession } from '@/lib/admin-auth'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -17,6 +18,15 @@ const reviewActionSchema = z.object({
  * List pending deal reviews
  */
 export async function GET(request: NextRequest) {
+  // Check admin session
+  const isAuthenticated = await getAdminSession()
+  if (!isAuthenticated) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401 }
+    )
+  }
+
   try {
     const { data: reviews, error } = await supabaseAdmin
       .from('deal_reviews')
@@ -65,6 +75,15 @@ export async function GET(request: NextRequest) {
  * Approve, reject, or fix a deal review
  */
 export async function POST(request: NextRequest) {
+  // Check admin session
+  const isAuthenticated = await getAdminSession()
+  if (!isAuthenticated) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401 }
+    )
+  }
+
   try {
     const body = await request.json()
     const validated = reviewActionSchema.parse(body)
