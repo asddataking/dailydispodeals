@@ -168,7 +168,8 @@ export async function POST(request: NextRequest) {
       update_dispensary: tool({
         description: 'Update an existing dispensary',
         parameters: updateDispensarySchema,
-        execute: async ({ id, ...updates }) => {
+        execute: async (args) => {
+          const { id, ...updates } = args as z.infer<typeof updateDispensarySchema>
           try {
             const updateData: Record<string, any> = {
               ...updates,
@@ -398,7 +399,8 @@ export async function POST(request: NextRequest) {
       get_ocr_status: tool({
         description: 'Check OCR and parsing status for a dispensary',
         parameters: getOcrStatusSchema,
-        execute: async ({ dispensary_name, date }) => {
+        execute: async (args) => {
+          const { dispensary_name, date } = args as z.infer<typeof getOcrStatusSchema>
           try {
             const targetDate = date || new Date().toISOString().split('T')[0]
 

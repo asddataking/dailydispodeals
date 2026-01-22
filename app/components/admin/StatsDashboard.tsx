@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase/client'
+import { useAdminAuth, getAuthHeaders } from '@/lib/hooks/useAdminAuth'
 import { SkeletonLoader } from '@/app/components/SkeletonLoader'
 
 interface Stats {
@@ -23,27 +23,22 @@ export function StatsDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [days, setDays] = useState(30)
+  const { token } = useAdminAuth()
 
   useEffect(() => {
-    fetchStats()
+    if (token !== null) {
+      fetchStats()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [days])
+  }, [days, token])
 
   const fetchStats = async () => {
     setLoading(true)
     setError('')
     try {
-      // Get auth token
-      const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token
-
       const { apiFetch, getErrorMessage, isErrorResponse, unwrapApiResponse } = await import('@/lib/api-client')
       const response = await apiFetch<Stats>(`/api/admin/stats?days=${days}`, {
-        headers: token
-          ? {
-              Authorization: `Bearer ${token}`,
-            }
-          : {},
+        headers: getAuthHeaders(token),
       })
       
       if (isErrorResponse(response)) {

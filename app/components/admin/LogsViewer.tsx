@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase/client'
+import { useAdminAuth, getAuthHeaders } from '@/lib/hooks/useAdminAuth'
 import { SkeletonLoader } from '@/app/components/SkeletonLoader'
 
 interface EmailLog {
@@ -31,26 +31,22 @@ export function LogsViewer() {
   const [ingestionLogs, setIngestionLogs] = useState<IngestionLog[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const { token } = useAdminAuth()
 
   useEffect(() => {
-    fetchLogs()
+    if (token !== null) {
+      fetchLogs()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [type, days])
+  }, [type, days, token])
 
   const fetchLogs = async () => {
     setLoading(true)
     setError('')
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token
-
       const { apiFetch, getErrorMessage, isErrorResponse, unwrapApiResponse } = await import('@/lib/api-client')
       const response = await apiFetch<{ email_logs: EmailLog[]; ingestion_logs: IngestionLog[] }>(`/api/admin/logs?type=${type}&days=${days}`, {
-        headers: token
-          ? {
-              Authorization: `Bearer ${token}`,
-            }
-          : {},
+        headers: getAuthHeaders(token),
       })
       
       if (isErrorResponse(response)) {

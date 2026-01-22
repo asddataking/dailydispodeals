@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase/client'
+import { useAdminAuth, getAuthHeaders } from '@/lib/hooks/useAdminAuth'
 import { SkeletonLoader } from '@/app/components/SkeletonLoader'
 
 interface Dispensary {
@@ -28,25 +28,21 @@ export function DispensaryManager() {
   const [discoverRadius, setDiscoverRadius] = useState<5 | 10 | 25>(25)
   const [discovering, setDiscovering] = useState(false)
   const [discoverResult, setDiscoverResult] = useState<{ success: boolean; discovered: number; message?: string } | null>(null)
+  const { token } = useAdminAuth()
 
   useEffect(() => {
-    fetchDispensaries()
-  }, [])
+    if (token !== null) {
+      fetchDispensaries()
+    }
+  }, [token])
 
   const fetchDispensaries = async () => {
     setLoading(true)
     setError('')
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token
-
       const { apiFetch, getErrorMessage, isErrorResponse, unwrapApiResponse } = await import('@/lib/api-client')
       const response = await apiFetch<{ dispensaries: Dispensary[] }>('/api/admin/dispensaries', {
-        headers: token
-          ? {
-              Authorization: `Bearer ${token}`,
-            }
-          : {},
+        headers: getAuthHeaders(token),
       })
       
       if (isErrorResponse(response)) {
@@ -68,17 +64,10 @@ export function DispensaryManager() {
     }
 
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token
-
       const { apiFetch, getErrorMessage, isErrorResponse } = await import('@/lib/api-client')
       const response = await apiFetch(`/api/admin/dispensaries?id=${id}`, {
         method: 'DELETE',
-        headers: token
-          ? {
-              Authorization: `Bearer ${token}`,
-            }
-          : {},
+        headers: getAuthHeaders(token),
       })
 
       if (isErrorResponse(response)) {
@@ -103,15 +92,10 @@ export function DispensaryManager() {
     setError('')
 
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token
-
       const { apiFetch, getErrorMessage, isErrorResponse, unwrapApiResponse } = await import('@/lib/api-client')
       const response = await apiFetch<{ discovered: number }>('/api/admin/discover', {
         method: 'POST',
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        headers: getAuthHeaders(token),
         body: JSON.stringify({
           zip: discoverZip,
           radius: discoverRadius,
@@ -245,6 +229,7 @@ export function DispensaryManager() {
             setShowAddModal(false)
             fetchDispensaries()
           }}
+          token={token}
         />
       )}
 
@@ -255,6 +240,7 @@ export function DispensaryManager() {
             setEditing(null)
             fetchDispensaries()
           }}
+          token={token}
         />
       )}
 
@@ -338,7 +324,7 @@ export function DispensaryManager() {
   )
 }
 
-function AddDispensaryModal({ onClose }: { onClose: () => void }) {
+function AddDispensaryModal({ onClose, token }: { onClose: () => void; token: string | null }) {
   const [formData, setFormData] = useState({
     name: '',
     city: '',
@@ -353,14 +339,11 @@ function AddDispensaryModal({ onClose }: { onClose: () => void }) {
     setSubmitting(true)
 
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token
-
       const res = await fetch('/api/admin/dispensaries', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...getAuthHeaders(token),
         },
         body: JSON.stringify({
           name: formData.name,
@@ -458,7 +441,7 @@ function AddDispensaryModal({ onClose }: { onClose: () => void }) {
   )
 }
 
-function EditDispensaryModal({ dispensary, onClose }: { dispensary: Dispensary; onClose: () => void }) {
+function EditDispensaryModal({ dispensary, onClose, token }: { dispensary: Dispensary; onClose: () => void; token: string | null }) {
   const [formData, setFormData] = useState({
     name: dispensary.name,
     city: dispensary.city || '',
@@ -474,14 +457,11 @@ function EditDispensaryModal({ dispensary, onClose }: { dispensary: Dispensary; 
     setSubmitting(true)
 
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token
-
       const res = await fetch('/api/admin/dispensaries', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...getAuthHeaders(token),
         },
         body: JSON.stringify({
           id: dispensary.id,

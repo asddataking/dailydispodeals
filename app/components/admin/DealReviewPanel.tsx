@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase/client'
+import { useAdminAuth, getAuthHeaders } from '@/lib/hooks/useAdminAuth'
 import { SkeletonLoader } from '@/app/components/SkeletonLoader'
 
 interface Review {
@@ -28,25 +28,21 @@ export function DealReviewPanel() {
   const [reviews, setReviews] = useState<Review[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const { token } = useAdminAuth()
 
   useEffect(() => {
-    fetchReviews()
-  }, [])
+    if (token !== null) {
+      fetchReviews()
+    }
+  }, [token])
 
   const fetchReviews = async () => {
     setLoading(true)
     setError('')
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token
-
       const { apiFetch, getErrorMessage, isErrorResponse, unwrapApiResponse } = await import('@/lib/api-client')
       const response = await apiFetch<{ reviews: Review[] }>('/api/admin/deals/review', {
-        headers: token
-          ? {
-              Authorization: `Bearer ${token}`,
-            }
-          : {},
+        headers: getAuthHeaders(token),
       })
       
       if (isErrorResponse(response)) {
@@ -64,15 +60,10 @@ export function DealReviewPanel() {
 
   const handleReview = async (reviewId: string, action: 'approve' | 'reject' | 'fix', notes?: string) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token
-
       const { apiFetch, getErrorMessage, isErrorResponse } = await import('@/lib/api-client')
       const response = await apiFetch('/api/admin/deals/review', {
         method: 'POST',
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        headers: getAuthHeaders(token),
         body: JSON.stringify({
           review_id: reviewId,
           action,

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { supabase } from '@/lib/supabase/client'
+import { useAdminAuth, getAuthHeaders } from '@/lib/hooks/useAdminAuth'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -20,6 +20,7 @@ export function GeminiChat() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const { token } = useAdminAuth()
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -39,14 +40,11 @@ export function GeminiChat() {
     setLoading(true)
 
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token
-
       const res = await fetch('/api/admin/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...getAuthHeaders(token),
         },
         body: JSON.stringify({
           messages: [...messages, userMessage].map((m) => ({
