@@ -5,6 +5,7 @@ import { generateText, tool } from 'ai'
 import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { geocodeZip } from '@/lib/geocoding'
+import * as Sentry from "@sentry/nextjs"
 import {
   success,
   unauthorized,
@@ -481,17 +482,67 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate response with function calling
-    const result = await generateText({
-      model,
-      system: SYSTEM_PROMPT,
-      messages: messages.map((msg: any) => ({
-        role: msg.role,
-        content: msg.content,
-      })),
-      tools,
-      // Note: maxSteps/maxToolRoundtrips may not be available in all AI SDK versions
-      // Tools will still work, but may require multiple turns for complex operations
-    })
+    const result = await Sentry.startSpan(
+      {
+        op: "ai.chat",
+        name: "Admin Chat Assistant",
+      },
+      async (span) => {
+        span.setAttribute("message_count", messages.length);
+        span.setAttribute("using_gateway", !!gatewayApiKey);
+        span.setAttribute("tool_count", Object.keys(tools).length);
+
+        try {
+          const result = await generateText({
+            model,
+            system: SYSTEM_PROMPT,
+            messages: messages.map((msg: any) => ({
+              role: msg.role,
+              content: msg.content,
+            })),
+            tools,
+            // Note: maxSteps/maxToolRoundtrips may not be available in all AI SDK versions
+            // Tools will still work, but may require multiple turns for complex operations
+          });
+
+          span.setAttribute("usage_tokens", result.usage?.totalTokens || 0);
+          span.setAttribute("tool_calls_count", result.toolCalls?.length || 0);
+
+          const { logger } = Sentry;
+          logger.info("Admin chat completed", {
+            messageCount: messages.length,
+            toolCallsCount: result.toolCalls?.length || 0,
+            usingGateway: !!gatewayApiKey,
+          });
+
+          return result;
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          
+          span.setAttribute("error", true);
+          span.setAttribute("error_message", errorMessage);
+
+          const { logger } = Sentry;
+          logger.error("Admin chat failed", {
+            messageCount: messages.length,
+            usingGateway: !!gatewayApiKey,
+            error: errorMessage,
+          });
+
+          Sentry.captureException(error, {
+            tags: {
+              operation: "ai_admin_chat",
+            },
+            extra: {
+              messageCount: messages.length,
+              usingGateway: !!gatewayApiKey,
+            },
+          });
+
+          throw error;
+        }
+      }
+    );
 
     return success({
       text: result.text,

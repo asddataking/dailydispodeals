@@ -2,6 +2,7 @@ import { generateObject } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { z } from 'zod'
+import * as Sentry from "@sentry/nextjs"
 
 const DealSchema = z.object({
   category: z.enum(['flower', 'pre-rolls', 'vapes', 'concentrates', 'edibles', 'drinks', 'topicals', 'cbd/thca', 'accessories']),
@@ -93,22 +94,78 @@ Return only valid JSON in this format:
   ]
 }`
 
-  try {
-    const result = await generateObject({
-      model,
-      system: systemPrompt,
-      prompt: userPrompt,
-      temperature: 0.1,
-      schema: ParseResponseSchema,
-    })
+  return Sentry.startSpan(
+    {
+      op: "ai.parse",
+      name: `Parse Deals - ${dispensaryName}`,
+    },
+    async (span) => {
+      span.setAttribute("dispensary", dispensaryName);
+      span.setAttribute("city", city || "unknown");
+      span.setAttribute("provider", provider);
+      span.setAttribute("using_gateway", !!gatewayApiKey);
+      span.setAttribute("ocr_text_length", ocrText.length);
 
-    // With generateObject, the result.object contains the parsed and validated data
-    const parsedData = result.object as { deals: Deal[] }
-    
-    // Filter deals with confidence < 0.5 (they'll be handled as summary entries)
-    return parsedData.deals.filter(deal => (deal.confidence ?? 1) >= 0.5)
-  } catch (error) {
-    console.error('AI parsing error:', error)
-    throw new Error(`AI parsing failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
-  }
+      try {
+        const result = await generateObject({
+          model,
+          system: systemPrompt,
+          prompt: userPrompt,
+          temperature: 0.1,
+          schema: ParseResponseSchema,
+        });
+
+        // With generateObject, the result.object contains the parsed and validated data
+        const parsedData = result.object as { deals: Deal[] };
+        
+        // Filter deals with confidence < 0.5 (they'll be handled as summary entries)
+        const filteredDeals = parsedData.deals.filter(deal => (deal.confidence ?? 1) >= 0.5);
+        
+        span.setAttribute("deals_found", parsedData.deals.length);
+        span.setAttribute("deals_filtered", filteredDeals.length);
+        span.setAttribute("usage_tokens", result.usage?.totalTokens || 0);
+
+        const { logger } = Sentry;
+        logger.info("AI parsing completed", {
+          dispensary: dispensaryName,
+          city: city || "unknown",
+          dealsFound: parsedData.deals.length,
+          dealsFiltered: filteredDeals.length,
+          provider,
+          usingGateway: !!gatewayApiKey,
+        });
+
+        return filteredDeals;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        
+        span.setAttribute("error", true);
+        span.setAttribute("error_message", errorMessage);
+
+        const { logger } = Sentry;
+        logger.error("AI parsing failed", {
+          dispensary: dispensaryName,
+          city: city || "unknown",
+          provider,
+          usingGateway: !!gatewayApiKey,
+          error: errorMessage,
+        });
+
+        Sentry.captureException(error, {
+          tags: {
+            operation: "ai_parse",
+            dispensary: dispensaryName,
+            provider,
+          },
+          extra: {
+            city,
+            usingGateway: !!gatewayApiKey,
+            ocrTextLength: ocrText.length,
+          },
+        });
+
+        throw new Error(`AI parsing failed: ${errorMessage}`);
+      }
+    }
+  );
 }

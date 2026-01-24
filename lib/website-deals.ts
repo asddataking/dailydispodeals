@@ -6,6 +6,7 @@
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { generateObject } from 'ai'
 import { z } from 'zod'
+import * as Sentry from "@sentry/nextjs"
 
 const DealSchema = z.object({
   category: z.enum(['flower', 'pre-rolls', 'vapes', 'concentrates', 'edibles', 'drinks', 'topicals', 'cbd/thca', 'accessories']),
@@ -89,19 +90,71 @@ Return only valid JSON in this format:
   ]
 }`
 
-  try {
-    const result = await generateObject({
-      model,
-      system: systemPrompt,
-      prompt: userPrompt,
-      temperature: 0.1,
-      schema: ParseResponseSchema,
-    })
+  return Sentry.startSpan(
+    {
+      op: "ai.extract_website_deals",
+      name: `Extract Website Deals - ${dispensaryName}`,
+    },
+    async (span) => {
+      span.setAttribute("dispensary", dispensaryName);
+      span.setAttribute("city", city || "unknown");
+      span.setAttribute("using_gateway", !!gatewayApiKey);
+      span.setAttribute("html_length", cleanedHtml.length);
 
-    const parsedData = result.object as { deals: WebsiteDeal[] }
-    return parsedData.deals.filter((deal) => (deal.confidence ?? 1) >= 0.5)
-  } catch (error) {
-    console.error('Website deal extraction error:', error)
-    throw new Error(`Website deal extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
-  }
+      try {
+        const result = await generateObject({
+          model,
+          system: systemPrompt,
+          prompt: userPrompt,
+          temperature: 0.1,
+          schema: ParseResponseSchema,
+        });
+
+        const parsedData = result.object as { deals: WebsiteDeal[] };
+        const filteredDeals = parsedData.deals.filter((deal) => (deal.confidence ?? 1) >= 0.5);
+        
+        span.setAttribute("deals_found", parsedData.deals.length);
+        span.setAttribute("deals_filtered", filteredDeals.length);
+        span.setAttribute("usage_tokens", result.usage?.totalTokens || 0);
+
+        const { logger } = Sentry;
+        logger.info("Website deal extraction completed", {
+          dispensary: dispensaryName,
+          city: city || "unknown",
+          dealsFound: parsedData.deals.length,
+          dealsFiltered: filteredDeals.length,
+          usingGateway: !!gatewayApiKey,
+        });
+
+        return filteredDeals;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        
+        span.setAttribute("error", true);
+        span.setAttribute("error_message", errorMessage);
+
+        const { logger } = Sentry;
+        logger.error("Website deal extraction failed", {
+          dispensary: dispensaryName,
+          city: city || "unknown",
+          usingGateway: !!gatewayApiKey,
+          error: errorMessage,
+        });
+
+        Sentry.captureException(error, {
+          tags: {
+            operation: "ai_extract_website_deals",
+            dispensary: dispensaryName,
+          },
+          extra: {
+            city,
+            usingGateway: !!gatewayApiKey,
+            htmlLength: cleanedHtml.length,
+          },
+        });
+
+        throw new Error(`Website deal extraction failed: ${errorMessage}`);
+      }
+    }
+  );
 }
