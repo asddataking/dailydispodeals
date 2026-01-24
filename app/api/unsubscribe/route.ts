@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { rateLimit } from '@/lib/rate-limit'
+import * as Sentry from "@sentry/nextjs"
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -65,7 +66,23 @@ export async function GET(request: NextRequest) {
       .eq('user_id', user.id)
 
     if (updateError) {
-      console.error('Failed to unsubscribe user:', updateError)
+      const { logger } = Sentry;
+      logger.error("Failed to unsubscribe user", {
+        error: updateError.message,
+        user_id: user.id,
+        email,
+      });
+
+      Sentry.captureException(updateError, {
+        tags: {
+          operation: "unsubscribe",
+        },
+        extra: {
+          user_id: user.id,
+          email,
+        },
+      });
+
       return NextResponse.json(
         { error: 'Failed to unsubscribe' },
         { status: 500 }
@@ -87,7 +104,17 @@ export async function GET(request: NextRequest) {
       message: 'You have been unsubscribed from daily deal emails.'
     })
   } catch (error) {
-    console.error('Unsubscribe error:', error)
+    const { logger } = Sentry;
+    logger.error("Unsubscribe error", {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+
+    Sentry.captureException(error instanceof Error ? error : new Error(String(error)), {
+      tags: {
+        operation: "unsubscribe",
+      },
+    });
+
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

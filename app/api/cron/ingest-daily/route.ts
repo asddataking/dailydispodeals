@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
           .select('user_id, zip, radius')
           .not('zip', 'is', null)
           .not('radius', 'is', null)
+          .limit(1000) // Prevent unbounded queries - reasonable limit for cron job
 
         if (usersError) {
           const { logger } = Sentry;

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { stripe } from '@/lib/stripe'
 import { rateLimit } from '@/lib/rate-limit'
 import { getOrCreateAuthUser } from '@/lib/auth-helpers'
+import * as Sentry from "@sentry/nextjs"
 import {
   success,
   validationError,
@@ -81,7 +82,18 @@ export async function POST(request: NextRequest) {
     if (error instanceof z.ZodError) {
       return validationError('Invalid input', error.errors)
     }
-    console.error('Stripe checkout error:', error)
+    
+    const { logger } = Sentry;
+    logger.error("Stripe checkout error", {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+
+    Sentry.captureException(error instanceof Error ? error : new Error(String(error)), {
+      tags: {
+        operation: "stripe_checkout",
+      },
+    });
+
     return serverError('Failed to create checkout session')
   }
 }

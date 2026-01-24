@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabase/server'
+import * as Sentry from "@sentry/nextjs"
 import {
   success,
   validationError,
@@ -117,7 +118,23 @@ export async function POST(request: NextRequest) {
       .then(({ error }) => {
         // Ignore unique constraint errors (already queued)
         if (error && error.code !== '23505') {
-          console.error('Failed to create WELCOME notification:', error)
+          const { logger } = Sentry;
+          logger.error("Failed to create WELCOME notification", {
+            error: error.message,
+            email: validated.email,
+            zone_id: zoneId,
+          });
+
+          Sentry.captureException(error, {
+            tags: {
+              operation: "subscribe",
+              step: "create_notification",
+            },
+            extra: {
+              email: validated.email,
+              zone_id: zoneId,
+            },
+          });
         }
       })
 
@@ -142,7 +159,18 @@ export async function POST(request: NextRequest) {
     if (error instanceof z.ZodError) {
       return validationError('Invalid input', error.errors)
     }
-    console.error('Subscribe API error:', error)
+    
+    const { logger } = Sentry;
+    logger.error("Subscribe API error", {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+
+    Sentry.captureException(error instanceof Error ? error : new Error(String(error)), {
+      tags: {
+        operation: "subscribe",
+      },
+    });
+
     return serverError('Internal server error')
   }
 }

@@ -57,6 +57,7 @@ export async function GET(request: NextRequest) {
       .from('deals')
       .select('category')
       .gte('date', startDateStr)
+      .limit(10000) // Prevent unbounded queries - reasonable limit for stats
 
     const categoryCounts: Record<string, number> = {}
     if (dealsByCategory) {

@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { rateLimit } from '@/lib/rate-limit'
+import * as Sentry from "@sentry/nextjs"
 import {
   getDispensariesInUserZones,
   addDistancesToDeals,
@@ -110,6 +111,7 @@ export async function GET(request: NextRequest) {
       .gte('date', twoDaysAgoStr) // Only show deals from last 2 days
       .in('category', preferences.categories)
       .eq('needs_review', false) // Only show approved deals
+      .limit(100) // Prevent unbounded queries
 
     // If user has brand preferences, filter by brands
     if (preferences.brands && preferences.brands.length > 0) {
@@ -141,7 +143,24 @@ export async function GET(request: NextRequest) {
     const { data: deals, error: dealsError } = await query
 
     if (dealsError) {
-      console.error('Deals query error:', dealsError)
+      const { logger } = Sentry;
+      logger.error("Deals query error", {
+        error: dealsError.message,
+        email,
+        date,
+      });
+
+      Sentry.captureException(dealsError, {
+        tags: {
+          operation: "deals_api",
+          step: "query_deals",
+        },
+        extra: {
+          email,
+          date,
+        },
+      });
+
       return serverError('Failed to fetch deals', dealsError)
     }
 
@@ -182,7 +201,17 @@ export async function GET(request: NextRequest) {
 
     return success({ deals: result })
   } catch (error) {
-    console.error('Deals API error:', error)
+    const { logger } = Sentry;
+    logger.error("Deals API error", {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+
+    Sentry.captureException(error instanceof Error ? error : new Error(String(error)), {
+      tags: {
+        operation: "deals_api",
+      },
+    });
+
     return serverError('Internal server error')
   }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminSession } from '@/lib/admin-auth'
 import { supabaseAdmin } from '@/lib/supabase/server'
+import * as Sentry from "@sentry/nextjs"
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -43,7 +44,17 @@ export async function GET(request: NextRequest) {
         .limit(1000)
 
       if (emailError) {
-        console.error('Error fetching email logs:', emailError)
+        const { logger } = Sentry;
+        logger.error("Error fetching email logs", {
+          error: emailError.message,
+        });
+
+        Sentry.captureException(emailError, {
+          tags: {
+            operation: "admin_logs",
+            log_type: "email",
+          },
+        });
       } else {
         results.email_logs = emailLogs || []
       }
@@ -59,7 +70,17 @@ export async function GET(request: NextRequest) {
         .limit(1000)
 
       if (ingestionError) {
-        console.error('Error fetching ingestion logs:', ingestionError)
+        const { logger } = Sentry;
+        logger.error("Error fetching ingestion logs", {
+          error: ingestionError.message,
+        });
+
+        Sentry.captureException(ingestionError, {
+          tags: {
+            operation: "admin_logs",
+            log_type: "ingestion",
+          },
+        });
       } else {
         results.ingestion_logs = ingestionLogs || []
       }
@@ -73,7 +94,17 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('Logs API error:', error)
+    const { logger } = Sentry;
+    logger.error("Logs API error", {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+
+    Sentry.captureException(error instanceof Error ? error : new Error(String(error)), {
+      tags: {
+        operation: "admin_logs",
+      },
+    });
+
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

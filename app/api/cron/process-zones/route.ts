@@ -117,7 +117,11 @@ export async function GET(request: NextRequest) {
             // Geocode ZIP
             const zipLocation = await geocodeZip(zone.zip)
             if (!zipLocation) {
-              console.warn(`Could not geocode zip ${zone.zip}`)
+              const { logger } = Sentry;
+              logger.warn("Could not geocode zip", {
+                zip: zone.zip,
+                zone_id: zone.id,
+              });
               // Schedule retry with backoff
               await supabaseAdmin
                 .from('zones')
@@ -223,7 +227,25 @@ export async function GET(request: NextRequest) {
                   .single()
 
                 if (insertError || !newDisp) {
-                  console.error('Failed to insert dispensary:', insertError)
+                  const { logger } = Sentry;
+                  logger.error("Failed to insert dispensary", {
+                    error: insertError?.message,
+                    dispensary_name: placeDetails.name,
+                    zone_id: zone.id,
+                    zip: zone.zip,
+                  });
+
+                  Sentry.captureException(insertError || new Error("Failed to insert dispensary"), {
+                    tags: {
+                      operation: "process_zones",
+                      step: "insert_dispensary",
+                    },
+                    extra: {
+                      dispensary_name: placeDetails.name,
+                      zone_id: zone.id,
+                    },
+                  });
+
                   continue
                 }
 
@@ -252,6 +274,7 @@ export async function GET(request: NextRequest) {
               .from('user_subscriptions')
               .select('email')
               .eq('zone_id', zone.id)
+              .limit(1000) // Prevent unbounded queries - reasonable limit per zone
 
             if (subscriptions && subscriptions.length > 0) {
               const notifications = subscriptions.map((sub) => ({
@@ -284,9 +307,14 @@ export async function GET(request: NextRequest) {
 
             processed++
           } catch (error) {
-            console.error(`Error processing zone ${zone.id} (${zone.zip}):`, error)
+            const { logger } = Sentry;
+            logger.error(`Error processing zone ${zone.id} (${zone.zip})`, {
+              error: error instanceof Error ? error.message : 'Unknown error',
+              zone_id: zone.id,
+              zip: zone.zip,
+            });
 
-            Sentry.captureException(error, {
+            Sentry.captureException(error instanceof Error ? error : new Error(String(error)), {
               tags: {
                 operation: "cron_process_zones",
                 zone_id: zone.id,

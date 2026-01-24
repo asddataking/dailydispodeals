@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { getDispensariesNearZip } from '@/lib/dispensary-discovery'
 import { rateLimit } from '@/lib/rate-limit'
+import * as Sentry from "@sentry/nextjs"
 import {
   success,
   validationError,
@@ -71,7 +72,22 @@ export async function POST(request: NextRequest) {
       })
 
     if (prefError) {
-      console.error('Preferences upsert error:', prefError)
+      const { logger } = Sentry;
+      logger.error("Preferences upsert error", {
+        error: prefError.message,
+        user_id: user.id,
+      });
+
+      Sentry.captureException(prefError, {
+        tags: {
+          operation: "save_preferences",
+        },
+        extra: {
+          user_id: user.id,
+          email: validated.email,
+        },
+      });
+
       return serverError('Failed to save preferences', prefError)
     }
 
@@ -117,7 +133,20 @@ export async function POST(request: NextRequest) {
           }
           // If still no zoneId, log but don't fail the request
           if (!zoneId) {
-            console.error('Failed to create or find zone:', zoneError)
+            const { logger } = Sentry;
+            logger.error("Failed to create or find zone", {
+              error: zoneError.message,
+              zip: normalizedZip,
+            });
+
+            Sentry.captureException(zoneError, {
+              tags: {
+                operation: "create_zone",
+              },
+              extra: {
+                zip: normalizedZip,
+              },
+            });
           }
         } else if (newZone) {
           zoneId = newZone.id
@@ -136,7 +165,22 @@ export async function POST(request: NextRequest) {
           })
           .then(({ error }) => {
             if (error && error.code !== '23505') {
-              console.error('Failed to link user to zone:', error)
+              const { logger } = Sentry;
+              logger.error("Failed to link user to zone", {
+                error: error.message,
+                email: validated.email,
+                zone_id: zoneId,
+              });
+
+              Sentry.captureException(error, {
+                tags: {
+                  operation: "link_user_zone",
+                },
+                extra: {
+                  email: validated.email,
+                  zone_id: zoneId,
+                },
+              });
             }
           })
 
@@ -155,11 +199,29 @@ export async function POST(request: NextRequest) {
       // Also discover dispensaries in that area (runs asynchronously)
       getDispensariesNearZip(validated.zip, validated.radius)
         .then(dispensaries => {
-          console.log(`Found ${dispensaries.length} dispensaries near zip ${validated.zip}`)
+          const { logger } = Sentry;
+          logger.info("Found dispensaries near zip", {
+            zip: validated.zip,
+            count: dispensaries.length,
+          });
           // Dispensaries are already in database, just ensuring they're tracked
         })
         .catch(error => {
-          console.error('Error discovering dispensaries:', error)
+          const { logger } = Sentry;
+          logger.error("Error discovering dispensaries", {
+            error: error instanceof Error ? error.message : 'Unknown error',
+            zip: validated.zip,
+          });
+
+          Sentry.captureException(error instanceof Error ? error : new Error(String(error)), {
+            tags: {
+              operation: "discover_dispensaries",
+            },
+            extra: {
+              zip: validated.zip,
+              radius: validated.radius,
+            },
+          });
           // Don't fail the request if discovery fails
         })
     }
@@ -169,7 +231,18 @@ export async function POST(request: NextRequest) {
     if (error instanceof z.ZodError) {
       return validationError('Invalid input', error.errors)
     }
-    console.error('Preferences API error:', error)
+    
+    const { logger } = Sentry;
+    logger.error("Preferences API error", {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+
+    Sentry.captureException(error instanceof Error ? error : new Error(String(error)), {
+      tags: {
+        operation: "preferences_api",
+      },
+    });
+
     return serverError('Internal server error')
   }
 }
