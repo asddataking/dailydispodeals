@@ -107,8 +107,8 @@ export default function Home() {
             <Image
               src="/logo.png"
               alt="Daily Dispo Deals Logo"
-              width={40}
-              height={40}
+              width={80}
+              height={80}
               className="drop-shadow-lg"
               priority
             />
@@ -192,21 +192,6 @@ export default function Home() {
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
             className="pt-8 sm:pt-12 lg:pt-20"
           >
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.05, ease: [0.16, 1, 0.3, 1] }}
-              className="mb-4 sm:mb-6"
-            >
-              <Image
-                src="/logo.png"
-                alt="Daily Dispo Deals Logo"
-                width={120}
-                height={120}
-                className="drop-shadow-2xl"
-                priority
-              />
-            </motion.div>
             <motion.h1
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
