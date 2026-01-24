@@ -38,7 +38,7 @@ export const metadata: Metadata = {
     siteName: "Daily Dispo Deals",
     images: [
       {
-        url: "/lake.webp",
+        url: "/logo.png",
         width: 1200,
         height: 630,
         alt: "Daily Dispo Deals - Best Cannabis Deals in Michigan",
@@ -49,7 +49,11 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Daily Dispo Deals - Best Cannabis Deals in Michigan",
     description: "Zero searching. Better weed deals. We find the best dispensary deals so you don't have to.",
-    images: ["/lake.webp"],
+    images: ["/logo.png"],
+  },
+  icons: {
+    icon: "/logo.png",
+    apple: "/logo.png",
   },
   alternates: {
     canonical: process.env.APP_URL || "https://dailydispodeals.com",
