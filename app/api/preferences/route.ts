@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
       const normalizedZip = validated.zip.padStart(5, '0')
       
       // Upsert zone by ZIP (idempotent)
-      let zoneId: string
+      let zoneId: string | undefined
       const { data: existingZone } = await supabaseAdmin
         .from('zones')
         .select('id')
