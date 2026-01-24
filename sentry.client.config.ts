@@ -29,4 +29,10 @@ Sentry.init({
   _experiments: {
     enableLogs: true,
   },
+
+  // Ignore Vercel Web Analytics errors (not a real application error)
+  ignoreErrors: [
+    /\[Vercel Web Analytics\].*Failed to load script/,
+    /\/_vercel\/insights\/script\.js/,
+  ],
 });

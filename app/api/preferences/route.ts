@@ -75,9 +75,84 @@ export async function POST(request: NextRequest) {
       return serverError('Failed to save preferences', prefError)
     }
 
-    // If zip and radius provided, discover dispensaries in that area
-    // This runs asynchronously to not block the response
+    // If zip and radius provided, ensure zone exists and user is subscribed to it
+    // This ensures send-daily cron can find the user's zones
     if (validated.zip && validated.radius) {
+      const normalizedZip = validated.zip.padStart(5, '0')
+      
+      // Upsert zone by ZIP (idempotent)
+      let zoneId: string
+      const { data: existingZone } = await supabaseAdmin
+        .from('zones')
+        .select('id')
+        .eq('zip', normalizedZip)
+        .single()
+
+      if (existingZone) {
+        zoneId = existingZone.id
+      } else {
+        // Insert new zone
+        const { data: newZone, error: zoneError } = await supabaseAdmin
+          .from('zones')
+          .insert({
+            zip: normalizedZip,
+            status: 'ACTIVE',
+            next_process_at: new Date().toISOString(), // Queue for processing
+            ttl_minutes: 360, // 6 hours default
+          })
+          .select('id')
+          .single()
+
+        if (zoneError) {
+          // Handle race condition: another request may have created the zone
+          if (zoneError.code === '23505') {
+            const { data: retryZone } = await supabaseAdmin
+              .from('zones')
+              .select('id')
+              .eq('zip', normalizedZip)
+              .single()
+            if (retryZone) {
+              zoneId = retryZone.id
+            }
+          }
+          // If still no zoneId, log but don't fail the request
+          if (!zoneId) {
+            console.error('Failed to create or find zone:', zoneError)
+          }
+        } else if (newZone) {
+          zoneId = newZone.id
+        }
+      }
+
+      // Link user to zone if zone was created/found
+      if (zoneId) {
+        await supabaseAdmin
+          .from('user_subscriptions')
+          .upsert({
+            email: validated.email,
+            zone_id: zoneId,
+          }, {
+            onConflict: 'email,zone_id',
+          })
+          .then(({ error }) => {
+            if (error && error.code !== '23505') {
+              console.error('Failed to link user to zone:', error)
+            }
+          })
+
+        // Ensure zone is queued for processing
+        await supabaseAdmin
+          .from('zones')
+          .update({
+            next_process_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', zoneId)
+          .lt('next_process_at', new Date().toISOString())
+          .or('next_process_at.is.null')
+      }
+
+      // Also discover dispensaries in that area (runs asynchronously)
       getDispensariesNearZip(validated.zip, validated.radius)
         .then(dispensaries => {
           console.log(`Found ${dispensaries.length} dispensaries near zip ${validated.zip}`)
