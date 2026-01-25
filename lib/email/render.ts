@@ -172,6 +172,82 @@ export function renderDailyDealsEmail(
   return { subject, html }
 }
 
+/** Weekly summary for free-plan users: best deals near zip from the last 7 days */
+export function renderWeeklySummaryEmail(
+  deals: Array<{
+    dispensary_name: string
+    title: string
+    product_name?: string | null
+    price_text: string
+    city: string | null
+    source_url: string | null
+    brands?: { name: string } | null
+  }>,
+  userEmail: string,
+  appUrl: string,
+  zip: string
+): { subject: string; html: string } {
+  const dealCount = deals.length
+  const subject =
+    dealCount > 0
+      ? `Your Weekly Dispo Deals — ${dealCount} ${dealCount === 1 ? 'Deal' : 'Deals'} Near You`
+      : 'Your Weekly Dispo Deals — No New Deals This Week'
+
+  const unsubscribeToken = createHash('sha256')
+    .update(`${userEmail}:${process.env.UNSUBSCRIBE_SECRET || 'change-me-in-production'}`)
+    .digest('hex')
+    .substring(0, 16)
+  const unsubscribeUrl = `${appUrl}/api/unsubscribe?email=${encodeURIComponent(userEmail)}&token=${unsubscribeToken}`
+  const manageUrl = `${appUrl}?email=${encodeURIComponent(userEmail)}`
+
+  const dealCards =
+    deals.length === 0
+      ? '<p style="padding: 20px; text-align: center; color: #555;">No new deals in your area this week. We’ll try again next week.</p>'
+      : deals.map((deal) => {
+          const brandName = deal.brands?.name
+          const displayTitle = brandName && deal.product_name ? `${brandName} ${deal.product_name}` : deal.title
+          return `
+    <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 16px; background: #ffffff;">
+      <h3 style="margin: 0 0 8px 0; color: #0a2540; font-size: 18px;">${escapeHtml(deal.dispensary_name)}</h3>
+      ${brandName ? `<p style="margin: 0 0 4px 0; color: #136694; font-size: 14px; font-weight: 600; text-transform: uppercase;">${escapeHtml(brandName)}</p>` : ''}
+      <p style="margin: 0 0 8px 0; color: #374151; font-size: 16px; font-weight: 600;">${escapeHtml(displayTitle)}</p>
+      <p style="margin: 0 0 8px 0; color: #059669; font-size: 18px; font-weight: 700;">${escapeHtml(deal.price_text)}</p>
+      ${deal.city ? `<p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px;">📍 ${escapeHtml(deal.city)}</p>` : ''}
+      ${deal.source_url ? `<a href="${escapeHtml(deal.source_url)}" style="color: #136694; text-decoration: none; font-size: 14px;">Verify Deal →</a>` : ''}
+    </div>
+  `
+        }).join('')
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${escapeHtml(subject)}</title>
+      </head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #374151; max-width: 600px; margin: 0 auto; padding: 20px; background: #f9fafb;">
+        <div style="background: linear-gradient(135deg, #0a2540 0%, #136694 100%); padding: 24px; border-radius: 8px 8px 0 0; text-align: center;">
+          <h1 style="color: #ffffff; margin: 0; font-size: 24px;">Daily Dispo Deals</h1>
+          <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 14px;">Weekly Summary</p>
+        </div>
+        <div style="background: #ffffff; padding: 24px; border-radius: 0 0 8px 8px;">
+          <p style="margin: 0 0 16px 0; color: #374151; font-size: 16px;">
+            Here are the best deals we found near <strong>${escapeHtml(zip)}</strong> this past week.
+          </p>
+          <h2 style="color: #0a2540; margin: 0 0 16px 0; font-size: 20px;">Best of the Week</h2>
+          ${dealCards}
+          <p style="margin: 24px 0 0 0; color: #6b7280; font-size: 12px; text-align: center;">
+            <a href="${unsubscribeUrl}" style="color: #9ca3af; text-decoration: underline;">Unsubscribe</a> | 
+            <a href="${manageUrl}" style="color: #9ca3af; text-decoration: underline;">Update zip</a>
+          </p>
+        </div>
+      </body>
+    </html>
+  `
+  return { subject, html }
+}
+
 function escapeHtml(text: string): string {
   const map: Record<string, string> = {
     '&': '&amp;',

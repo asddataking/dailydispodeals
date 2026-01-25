@@ -3,8 +3,12 @@ import { supabaseAdmin } from './supabase/server'
 /**
  * Get or create a Supabase Auth user silently (no email sent)
  * Returns the auth user ID
+ * @param createdVia - 'stripe_checkout' for paid signup, 'free_signup' for freemium
  */
-export async function getOrCreateAuthUser(email: string): Promise<string> {
+export async function getOrCreateAuthUser(
+  email: string,
+  createdVia: 'stripe_checkout' | 'free_signup' = 'stripe_checkout'
+): Promise<string> {
   try {
     // Check if auth user already exists
     const { data: existingUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers()
@@ -21,7 +25,7 @@ export async function getOrCreateAuthUser(email: string): Promise<string> {
       email,
       email_confirm: true, // Auto-confirm email so no confirmation email is sent
       user_metadata: {
-        created_via: 'stripe_checkout',
+        created_via: createdVia,
       },
     })
 
