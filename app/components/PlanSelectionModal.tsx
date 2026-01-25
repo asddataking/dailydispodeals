@@ -16,6 +16,9 @@ export function PlanSelectionModal({ open, onOpenChange, initialEmail = '' }: Pl
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const hasPreFilledEmail = !!(initialEmail && String(initialEmail).trim())
+  const emailToSubmit = hasPreFilledEmail ? String(initialEmail).trim() : email
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -25,7 +28,7 @@ export function PlanSelectionModal({ open, onOpenChange, initialEmail = '' }: Pl
       const { apiFetch, getErrorMessage, isErrorResponse, unwrapApiResponse } = await import('@/lib/api-client')
       const response = await apiFetch<{ url: string }>('/api/stripe/create-checkout-session', {
         method: 'POST',
-        body: JSON.stringify({ email, plan }),
+        body: JSON.stringify({ email: emailToSubmit, plan }),
       })
 
       if (isErrorResponse(response)) {
@@ -73,20 +76,26 @@ export function PlanSelectionModal({ open, onOpenChange, initialEmail = '' }: Pl
           </Dialog.Title>
           
           <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full px-4 py-3 text-base border border-gray-300 rounded-md focus:ring-2 focus:ring-lake-blue-600 focus:border-transparent"
-                placeholder="your@email.com"
-              />
-            </div>
+            {hasPreFilledEmail ? (
+              <p className="text-sm text-gray-600">
+                We&apos;ll send your deals to <span className="font-medium text-lake-blue-900">{emailToSubmit}</span>
+              </p>
+            ) : (
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                  Email
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="w-full px-4 py-3 text-base border border-gray-300 rounded-md focus:ring-2 focus:ring-lake-blue-600 focus:border-transparent"
+                  placeholder="your@email.com"
+                />
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-3">
