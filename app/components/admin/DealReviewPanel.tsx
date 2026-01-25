@@ -157,7 +157,7 @@ export function DealReviewPanel() {
               value={addUrlSource}
               onChange={(e) => { setAddUrlSource(e.target.value); setAddUrlError(''); setAddUrlResult(null) }}
               placeholder="https://..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder:text-gray-500 focus:ring-2 focus:ring-lake-blue-500 focus:border-transparent"
               disabled={addUrlLoading}
             />
           </div>
@@ -167,7 +167,7 @@ export function DealReviewPanel() {
               id="add-url-dispensary"
               value={addUrlDispensaryId}
               onChange={(e) => { setAddUrlDispensaryId(e.target.value); setAddUrlError(''); setAddUrlResult(null) }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-lake-blue-500 focus:border-transparent"
               disabled={addUrlLoading || dispensaries.length === 0}
             >
               <option value="">Select a dispensary</option>
