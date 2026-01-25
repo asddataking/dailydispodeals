@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getAdminSession } from '@/lib/admin-auth'
 import { getDispensariesNearZip } from '@/lib/dispensary-discovery'
+import { success, validationError, serverError, unauthorized } from '@/lib/api-response'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -16,27 +17,21 @@ const discoverSchema = z.object({
  * Manually discover dispensaries for a zip code
  */
 export async function POST(request: NextRequest) {
-  // Check admin session
   const session = await getAdminSession()
   if (!session.authenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
-    )
+    return unauthorized('Unauthorized')
   }
 
   try {
     const body = await request.json()
     const validated = discoverSchema.parse(body)
 
-    // Discover dispensaries
     const dispensaries = await getDispensariesNearZip(validated.zip, validated.radius)
 
-    return NextResponse.json({
-      success: true,
+    return success({
+      discovered: dispensaries.length,
       zip: validated.zip,
       radius: validated.radius,
-      discovered: dispensaries.length,
       dispensaries: dispensaries.map(d => ({
         name: d.name,
         city: d.city,
@@ -47,15 +42,9 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Invalid input', details: error.errors },
-        { status: 400 }
-      )
+      return validationError('Invalid input', error.errors)
     }
     console.error('Discovery error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return serverError('Internal server error')
   }
 }

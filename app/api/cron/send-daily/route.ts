@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { resend } from '@/lib/resend'
-import { renderDailyDealsEmail } from '@/lib/email/render'
+import { renderDailyDealsEmail, renderWelcomeEmail } from '@/lib/email/render'
 import * as Sentry from "@sentry/nextjs"
 import {
   getDispensariesInUserZones,
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
       try {
         const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD
 
-        // Process notifications_outbox queue for DEALS_READY notifications
+        // Process notifications_outbox queue for WELCOME and DEALS_READY
         // Only process PENDING notifications that haven't exceeded retry limit
         const { data: pendingNotifications, error: queueError } = await supabaseAdmin
           .from('notifications_outbox')
@@ -60,10 +60,11 @@ export async function GET(request: NextRequest) {
             id,
             email,
             zone_id,
+            type,
             retry_count,
             zones!inner(zip)
           `)
-          .eq('type', 'DEALS_READY')
+          .in('type', ['WELCOME', 'DEALS_READY'])
           .eq('status', 'PENDING')
           .lt('retry_count', MAX_RETRIES)
           .order('created_at', { ascending: true })
@@ -112,9 +113,32 @@ export async function GET(request: NextRequest) {
           await Promise.all(batch.map(async (notification) => {
             const zone = notification.zones as any
             const email = notification.email
+            const notifType = (notification as { type?: string }).type || 'DEALS_READY'
 
             try {
-              // Find user by email
+              // WELCOME: send simple welcome email (no user/preferences/deals checks)
+              if (notifType === 'WELCOME') {
+                const appUrl = process.env.APP_URL || 'https://dailydispodeals.com'
+                const { subject, html } = renderWelcomeEmail(email, appUrl)
+                await resend.emails.send({
+                  from: 'Daily Dispo Deals <deals@dailydispodeals.com>',
+                  to: email,
+                  subject,
+                  html,
+                })
+                await supabaseAdmin
+                  .from('notifications_outbox')
+                  .update({
+                    status: 'SENT',
+                    sent_at: new Date().toISOString(),
+                    last_attempted_at: new Date().toISOString(),
+                  })
+                  .eq('id', notification.id)
+                sent++
+                return
+              }
+
+              // DEALS_READY: Find user by email
               const { data: user, error: userError } = await supabaseAdmin
                 .from('users')
                 .select('id')

@@ -1,5 +1,37 @@
 import { createHash } from 'crypto'
 
+export function renderWelcomeEmail(userEmail: string, appUrl: string): { subject: string; html: string } {
+  const subject = 'Welcome to Daily Dispo Deals'
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${escapeHtml(subject)}</title>
+      </head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #374151; max-width: 600px; margin: 0 auto; padding: 20px; background: #f9fafb;">
+        <div style="background: linear-gradient(135deg, #0a2540 0%, #136694 100%); padding: 24px; border-radius: 8px 8px 0 0; text-align: center;">
+          <h1 style="color: #ffffff; margin: 0; font-size: 24px;">Daily Dispo Deals</h1>
+        </div>
+        <div style="background: #ffffff; padding: 24px; border-radius: 0 0 8px 8px;">
+          <h2 style="color: #0a2540; margin: 0 0 16px 0; font-size: 20px;">You're in!</h2>
+          <p style="margin: 0 0 16px 0; color: #374151; font-size: 16px;">
+            Thanks for signing up. Set your preferences to get personalized cannabis deals delivered to your inbox.
+          </p>
+          <p style="margin: 0 0 24px 0;">
+            <a href="${appUrl}?email=${encodeURIComponent(userEmail)}" style="display: inline-block; padding: 12px 24px; background: #136694; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600;">Set Preferences</a>
+          </p>
+          <p style="margin: 0; color: #6b7280; font-size: 14px;">
+            Daily Dispo Deals – your personalized cannabis deals, daily.
+          </p>
+        </div>
+      </body>
+    </html>
+  `
+  return { subject, html }
+}
+
 export function renderDailyDealsEmail(
   deals: Array<{
     dispensary_name: string

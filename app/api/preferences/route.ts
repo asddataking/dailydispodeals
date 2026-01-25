@@ -205,6 +205,30 @@ export async function POST(request: NextRequest) {
             }
           })
 
+        // Queue welcome email (idempotent; send-daily processes WELCOME)
+        await supabaseAdmin
+          .from('notifications_outbox')
+          .insert({
+            email: validated.email,
+            zone_id: zoneId,
+            type: 'WELCOME',
+            status: 'PENDING',
+          })
+          .then(({ error }) => {
+            if (error && error.code !== '23505') {
+              const { logger } = Sentry;
+              logger.error("Failed to queue WELCOME notification", {
+                error: error.message,
+                email: validated.email,
+                zone_id: zoneId,
+              });
+              Sentry.captureException(error, {
+                tags: { operation: "queue_welcome" },
+                extra: { email: validated.email, zone_id: zoneId },
+              });
+            }
+          })
+
         // Ensure zone is queued for processing
         await supabaseAdmin
           .from('zones')
