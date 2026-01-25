@@ -56,14 +56,17 @@ export async function searchDispensariesNearLocation(
         continue
       }
 
+      // Text Search does not return website; always call Place Details to get website (and phone)
+      const details = await getPlaceDetails(place.place_id)
+
       places.push({
         place_id: place.place_id,
         name: place.name,
-        address: place.formatted_address,
+        address: details?.address ?? place.formatted_address,
         latitude: location.lat,
         longitude: location.lng,
-        phone: place.formatted_phone_number,
-        website: place.website,
+        phone: details?.phone ?? place.formatted_phone_number,
+        website: details?.website ?? place.website,
       })
     }
 

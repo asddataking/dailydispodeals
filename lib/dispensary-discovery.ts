@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/nextjs'
 import { geocodeZip, calculateDistance } from './geocoding'
 import { supabaseAdmin } from './supabase/server'
+import { searchDispensariesNearLocation } from './places'
 
 interface DispensaryCandidate {
   name: string
@@ -10,6 +11,8 @@ interface DispensaryCandidate {
   longitude?: number
   weedmaps_url?: string
   flyer_url?: string
+  place_id?: string
+  website?: string
 }
 
 /**
@@ -55,86 +58,27 @@ export async function discoverDispensariesForZip(
     }))
   }
 
-  // No existing dispensaries for this zip - discover via Google Places
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY
-  if (!apiKey) {
-    const { logger } = Sentry
-    logger.warn('GOOGLE_MAPS_API_KEY not configured, skipping dispensary discovery', { zip })
-    Sentry.captureMessage('GOOGLE_MAPS_API_KEY not configured; Places discovery skipped', {
-      level: 'warning',
-      tags: { feature: 'dispensary_discovery' },
-      extra: { zip },
-    })
-    return []
-  }
-
+  // No existing dispensaries for this zip - discover via Google Places (searchDispensariesNearLocation + Place Details for website)
   try {
     const radiusMeters = Math.min(radiusMiles, 50) * 1609.34 // cap radius to 50 miles
-    const url = new URL('https://maps.googleapis.com/maps/api/place/textsearch/json')
-    url.searchParams.set('key', apiKey)
-    url.searchParams.set('query', 'cannabis dispensary')
-    url.searchParams.set('location', `${zipLocation.latitude},${zipLocation.longitude}`)
-    url.searchParams.set('radius', String(Math.round(radiusMeters)))
-
-    const response = await fetch(url.toString())
-    if (!response.ok) {
-      const { logger } = Sentry
-      logger.error('Places API error', { status: response.status, statusText: response.statusText, zip })
-      Sentry.captureException(new Error(`Places API error: ${response.status} ${response.statusText}`), {
-        tags: { feature: 'dispensary_discovery' },
-        extra: { zip, radiusMiles, status: response.status },
-      })
-      return []
-    }
-
-    const data = await response.json()
-
-    if (data.status && data.status !== 'OK') {
-      const { logger } = Sentry
-      logger.warn('Places API non-OK status', { status: data.status, error_message: data.error_message, zip })
-      Sentry.captureMessage('Places API returned non-OK status', {
-        level: 'warning',
-        tags: { feature: 'dispensary_discovery', places_status: data.status },
-        extra: { zip, radiusMiles, status: data.status, error_message: data.error_message },
-      })
-      if (data.status === 'OVER_QUERY_LIMIT' || data.status === 'RESOURCE_EXHAUSTED') {
-        return []
-      }
-    }
-
-    const results: any[] = Array.isArray(data.results) ? data.results : []
+    const places = await searchDispensariesNearLocation(
+      zipLocation.latitude,
+      zipLocation.longitude,
+      radiusMeters,
+      20
+    )
 
     const candidates: DispensaryCandidate[] = []
 
-    for (const place of results) {
-      const name = place.name as string | undefined
-      if (!name) continue
-
-      const location = place.geometry?.location
-      const latitude = typeof location?.lat === 'number' ? location.lat : undefined
-      const longitude = typeof location?.lng === 'number' ? location.lng : undefined
-
-      // Extract city and zip from address components if available
-      let city: string | undefined
-      let placeZip: string | undefined
-      const components = place.address_components as any[] | undefined
-      if (components) {
-        for (const c of components) {
-          if (c.types?.includes('locality')) {
-            city = c.long_name
-          }
-          if (c.types?.includes('postal_code')) {
-            placeZip = c.long_name
-          }
-        }
-      }
-
+    for (const place of places) {
       const candidate: DispensaryCandidate = {
-        name,
-        city: city || zipLocation.city,
-        zip: placeZip || zip,
-        latitude,
-        longitude,
+        name: place.name,
+        city: zipLocation.city,
+        zip,
+        latitude: place.latitude,
+        longitude: place.longitude,
+        place_id: place.place_id,
+        website: place.website,
       }
 
       candidates.push(candidate)
@@ -163,31 +107,105 @@ export async function discoverDispensariesForZip(
 /**
  * Add a dispensary to the database
  * Used when manually adding or when discovered via API
+ * When place_id is provided, prefers lookup by place_id to avoid duplicates across discover and process-zones.
  */
 export async function addDispensary(
   dispensary: DispensaryCandidate
 ): Promise<{ id: string } | null> {
-  // Check if dispensary already exists
+  const updateFields = (existing: { id: string; city?: string; zip?: string; latitude?: number; longitude?: number; weedmaps_url?: string; flyer_url?: string; website?: string }) => ({
+    city: dispensary.city || existing.city,
+    zip: dispensary.zip || existing.zip,
+    latitude: dispensary.latitude || existing.latitude,
+    longitude: dispensary.longitude || existing.longitude,
+    weedmaps_url: dispensary.weedmaps_url || existing.weedmaps_url,
+    flyer_url: dispensary.flyer_url || existing.flyer_url,
+    website: dispensary.website ?? existing.website,
+    active: true,
+    updated_at: new Date().toISOString(),
+  })
+
+  // When place_id is present, try lookup by place_id first (dedupe with process-zones)
+  if (dispensary.place_id) {
+    const { data: byPlaceId } = await supabaseAdmin
+      .from('dispensaries')
+      .select('id, city, zip, latitude, longitude, weedmaps_url, flyer_url, website')
+      .eq('place_id', dispensary.place_id)
+      .single()
+
+    if (byPlaceId) {
+      const { data, error } = await supabaseAdmin
+        .from('dispensaries')
+        .update(updateFields(byPlaceId))
+        .eq('id', byPlaceId.id)
+        .select('id')
+        .single()
+      if (error) {
+        console.error('Error updating dispensary by place_id:', error)
+        return null
+      }
+      return data ? { id: data.id } : null
+    }
+
+    // Not found by place_id; try by name to link place_id and website to existing row
+    const { data: byName } = await supabaseAdmin
+      .from('dispensaries')
+      .select('id, city, zip, latitude, longitude, weedmaps_url, flyer_url, website')
+      .eq('name', dispensary.name)
+      .single()
+
+    if (byName) {
+      const { data, error } = await supabaseAdmin
+        .from('dispensaries')
+        .update({
+          ...updateFields(byName),
+          place_id: dispensary.place_id,
+        })
+        .eq('id', byName.id)
+        .select('id')
+        .single()
+      if (error) {
+        console.error('Error updating dispensary by name (link place_id):', error)
+        return null
+      }
+      return data ? { id: data.id } : null
+    }
+
+    // Insert new with place_id and website
+    const { data, error } = await supabaseAdmin
+      .from('dispensaries')
+      .insert({
+        name: dispensary.name,
+        city: dispensary.city,
+        zip: dispensary.zip,
+        latitude: dispensary.latitude,
+        longitude: dispensary.longitude,
+        weedmaps_url: dispensary.weedmaps_url,
+        flyer_url: dispensary.flyer_url,
+        place_id: dispensary.place_id,
+        website: dispensary.website,
+        active: true,
+      })
+      .select('id')
+      .single()
+
+    if (error) {
+      console.error('Error adding dispensary with place_id:', error)
+      return null
+    }
+    return data ? { id: data.id } : null
+  }
+
+  // No place_id: legacy behavior (match by name only)
   const { data: existing } = await supabaseAdmin
     .from('dispensaries')
-    .select('id, city, zip, latitude, longitude, weedmaps_url, flyer_url')
+    .select('id, city, zip, latitude, longitude, weedmaps_url, flyer_url, website')
     .eq('name', dispensary.name)
     .single()
 
   if (existing) {
-    // Update existing dispensary
     const { data, error } = await supabaseAdmin
       .from('dispensaries')
-      .update({
-        city: dispensary.city || existing.city,
-        zip: dispensary.zip || existing.zip,
-        latitude: dispensary.latitude || existing.latitude,
-        longitude: dispensary.longitude || existing.longitude,
-        weedmaps_url: dispensary.weedmaps_url || existing.weedmaps_url,
-        flyer_url: dispensary.flyer_url || existing.flyer_url,
-        active: true,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateFields(existing))
       .eq('id', existing.id)
       .select('id')
       .single()
@@ -197,10 +215,10 @@ export async function addDispensary(
       return null
     }
 
-    return { id: data.id }
+    return data ? { id: data.id } : null
   }
 
-  // Insert new dispensary
+  // Insert new dispensary (no place_id)
   const { data, error } = await supabaseAdmin
     .from('dispensaries')
     .insert({
@@ -211,6 +229,7 @@ export async function addDispensary(
       longitude: dispensary.longitude,
       weedmaps_url: dispensary.weedmaps_url,
       flyer_url: dispensary.flyer_url,
+      website: dispensary.website,
       active: true,
     })
     .select('id')
@@ -221,7 +240,7 @@ export async function addDispensary(
     return null
   }
 
-  return { id: data.id }
+  return data ? { id: data.id } : null
 }
 
 /**

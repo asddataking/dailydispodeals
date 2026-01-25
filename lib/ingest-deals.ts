@@ -11,9 +11,14 @@ export interface DispensaryForIngest {
 const APP_URL = process.env.APP_URL || ''
 
 /**
- * Ingest deals for a single dispensary (flyer and/or website).
+ * Ingest deals for a single dispensary.
+ * Runs flyer (Weedmaps or any image/PDF) first; if no deals from flyer, tries website as fallback.
  * Uses /api/ingest/fetch, ocr, parse and /api/ingest/website-deals.
  * Updates dispensary ingestion stats on success/failure.
+ *
+ * Optional / follow-up: A Weedmaps flyer resolver could use dispensary name+city to find the
+ * deal/flyer image URL on Weedmaps when flyer_url is missing; name+city is a good lookup key.
+ *
  * @returns Number of deals inserted
  */
 export async function ingestDealsForDispensary(
@@ -25,30 +30,27 @@ export async function ingestDealsForDispensary(
 
   let dealsInserted = 0
 
-  const [flyerResult, websiteResult] = await Promise.allSettled([
-    dispensary.flyer_url && APP_URL
-      ? (async () => {
-          try {
-            const fetchResponse = await fetch(`${APP_URL}/api/ingest/fetch`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                dispensary_name: dispensary.name,
-                source_url: dispensary.flyer_url,
-              }),
-            })
-            if (!fetchResponse.ok) return 0
-            const fetchData = await fetchResponse.json()
-            if (fetchData.skipped) return 0
-
-            const ocrResponse = await fetch(`${APP_URL}/api/ingest/ocr`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ file_path: fetchData.file_path }),
-            })
-            if (!ocrResponse.ok) return 0
+  // 1. Flyer first (Weedmaps or any flyer URL)
+  if (dispensary.flyer_url && APP_URL) {
+    try {
+      const fetchResponse = await fetch(`${APP_URL}/api/ingest/fetch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dispensary_name: dispensary.name,
+          source_url: dispensary.flyer_url,
+        }),
+      })
+      if (fetchResponse.ok) {
+        const fetchData = await fetchResponse.json()
+        if (!fetchData.skipped) {
+          const ocrResponse = await fetch(`${APP_URL}/api/ingest/ocr`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ file_path: fetchData.file_path }),
+          })
+          if (ocrResponse.ok) {
             const ocrData = await ocrResponse.json()
-
             const parseResponse = await fetch(`${APP_URL}/api/ingest/parse`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -59,64 +61,62 @@ export async function ingestDealsForDispensary(
                 source_url: dispensary.flyer_url,
               }),
             })
-            if (!parseResponse.ok) return 0
-            const parseData = await parseResponse.json()
-            return parseData.deals_inserted || 0
-          } catch (err) {
-            const { logger } = Sentry
-            logger.warn('Flyer ingestion failed', {
-              dispensary: dispensary.name,
-              error: err instanceof Error ? err.message : 'Unknown error',
-            })
-            return 0
-          }
-        })()
-      : Promise.resolve(0),
-
-    dispensary.website && APP_URL
-      ? (async () => {
-          try {
-            const website = dispensary.website!
-            const possibleUrls = [
-              website.endsWith('/') ? website + 'deals' : website + '/deals',
-              website.endsWith('/') ? website + 'specials' : website + '/specials',
-              website.endsWith('/') ? website + 'menu' : website + '/menu',
-              website,
-            ]
-            for (const url of possibleUrls) {
-              try {
-                const res = await fetch(`${APP_URL}/api/ingest/website-deals`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    dispensary_name: dispensary.name,
-                    website_url: url,
-                    city: dispensary.city,
-                  }),
-                })
-                if (res.ok) {
-                  const data = await res.json()
-                  if (data.deals_inserted > 0) return data.deals_inserted || 0
-                }
-              } catch {
-                continue
-              }
+            if (parseResponse.ok) {
+              const parseData = await parseResponse.json()
+              dealsInserted = parseData.deals_inserted || 0
             }
-            return 0
-          } catch (err) {
-            const { logger } = Sentry
-            logger.warn('Website extraction failed', {
-              dispensary: dispensary.name,
-              error: err instanceof Error ? err.message : 'Unknown error',
-            })
-            return 0
           }
-        })()
-      : Promise.resolve(0),
-  ])
+        }
+      }
+    } catch (err) {
+      const { logger } = Sentry
+      logger.warn('Flyer ingestion failed', {
+        dispensary: dispensary.name,
+        error: err instanceof Error ? err.message : 'Unknown error',
+      })
+    }
+  }
 
-  if (flyerResult.status === 'fulfilled') dealsInserted += flyerResult.value
-  if (websiteResult.status === 'fulfilled') dealsInserted += websiteResult.value
+  // 2. If no deals from flyer, try website as fallback
+  if (dealsInserted === 0 && dispensary.website && APP_URL) {
+    try {
+      const website = dispensary.website
+      const possibleUrls = [
+        website.endsWith('/') ? website + 'deals' : website + '/deals',
+        website.endsWith('/') ? website + 'specials' : website + '/specials',
+        website.endsWith('/') ? website + 'menu' : website + '/menu',
+        website,
+      ]
+      for (const url of possibleUrls) {
+        try {
+          const res = await fetch(`${APP_URL}/api/ingest/website-deals`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              dispensary_name: dispensary.name,
+              website_url: url,
+              city: dispensary.city,
+            }),
+          })
+          if (res.ok) {
+            const data = await res.json()
+            if (data.deals_inserted > 0) {
+              dealsInserted = data.deals_inserted
+              break
+            }
+          }
+        } catch {
+          continue
+        }
+      }
+    } catch (err) {
+      const { logger } = Sentry
+      logger.warn('Website extraction failed', {
+        dispensary: dispensary.name,
+        error: err instanceof Error ? err.message : 'Unknown error',
+      })
+    }
+  }
 
   await updateDispensaryStats(dispensary.name, dealsInserted > 0)
   return dealsInserted
