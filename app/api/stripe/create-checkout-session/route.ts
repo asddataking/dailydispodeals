@@ -36,12 +36,14 @@ export async function POST(request: NextRequest) {
     if (!process.env.STRIPE_SECRET_KEY) missing.push('STRIPE_SECRET_KEY')
     if (!process.env.STRIPE_MONTHLY_PRICE_ID) missing.push('STRIPE_MONTHLY_PRICE_ID')
     if (!process.env.STRIPE_YEARLY_PRICE_ID) missing.push('STRIPE_YEARLY_PRICE_ID')
-    if (!process.env.APP_URL) missing.push('APP_URL')
     if (!process.env.SUPABASE_URL) missing.push('SUPABASE_URL')
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) missing.push('SUPABASE_SERVICE_ROLE_KEY')
     if (missing.length > 0) {
       return serverError('Checkout not configured', `Missing in Vercel: ${missing.join(', ')}`)
     }
+
+    // Base URL for success/cancel redirects: APP_URL or derived from request
+    const baseUrl = process.env.APP_URL || new URL(request.url).origin
 
     // Create/get Supabase Auth user silently (before Stripe checkout)
     const authUserId = await getOrCreateAuthUser(validated.email)
@@ -81,8 +83,8 @@ export async function POST(request: NextRequest) {
           quantity: 1,
         },
       ],
-      success_url: `${process.env.APP_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.APP_URL}/?canceled=1`,
+      success_url: `${baseUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/?canceled=1`,
       metadata: {
         auth_user_id: authUserId,
       },
