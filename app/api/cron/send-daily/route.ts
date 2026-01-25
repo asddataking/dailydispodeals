@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { resend } from '@/lib/resend'
-import { renderDailyDealsEmail, renderWelcomeEmail } from '@/lib/email/render'
+import {
+  renderDailyDealsEmail,
+  renderWelcomeEmail,
+  buildDealsTemplateVariables,
+  getDealsEmailSubject,
+} from '@/lib/email/render'
 import * as Sentry from "@sentry/nextjs"
 import {
   getDispensariesInUserZones,
@@ -271,20 +276,36 @@ export async function GET(request: NextRequest) {
 
               // Rank deals: group duplicates and rank by distance
               const rankedDeals = rankDealsWithDistance(dealsWithDistances)
+              const appUrl = process.env.APP_URL || 'https://dailydispodeals.com'
+              const zoneZip = (zone as { zip?: string } | null)?.zip ?? preferences.zip ?? ''
 
-              // Render and send email
-              const { subject, html } = renderDailyDealsEmail(
-                rankedDeals,
-                email,
-                process.env.APP_URL || 'https://dailydispodeals.com'
-              )
-
-              await resend.emails.send({
-                from: 'Daily Dispo Deals <deals@dailydispodeals.com>',
-                to: email,
-                subject,
-                html,
-              })
+              const templateId = process.env.RESEND_DEALS_TEMPLATE_ID
+              if (templateId) {
+                // Use Resend template (lib/email/deals-template.html). Resend API supports template; SDK types require html|react|text so we cast.
+                const variables = buildDealsTemplateVariables(
+                  rankedDeals,
+                  zoneZip,
+                  email,
+                  appUrl,
+                  today
+                )
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Resend API supports template; SDK CreateEmailOptions omits it
+                await resend.emails.send({
+                  from: 'Daily Dispo Deals <deals@dailydispodeals.com>',
+                  to: email,
+                  subject: getDealsEmailSubject(rankedDeals.length),
+                  template: { id: templateId, variables },
+                } as any)
+              } else {
+                // Fallback: inline HTML
+                const { subject, html } = renderDailyDealsEmail(rankedDeals, email, appUrl)
+                await resend.emails.send({
+                  from: 'Daily Dispo Deals <deals@dailydispodeals.com>',
+                  to: email,
+                  subject,
+                  html,
+                })
+              }
 
               // Log success
               await supabaseAdmin

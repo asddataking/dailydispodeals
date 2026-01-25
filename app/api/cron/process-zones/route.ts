@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { geocodeZip } from '@/lib/geocoding'
+import { ingestDealsForDispensary, type DispensaryForIngest } from '@/lib/ingest-deals'
 import { searchDispensariesNearLocation, getPlaceDetails } from '@/lib/places'
 import * as Sentry from "@sentry/nextjs"
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
+/** Zones to process per cron run (5–10; overridable via ?batchSize=). One zone per ZIP; each zone can have multiple users. */
 const DEFAULT_BATCH_SIZE = 10
 const DEFAULT_TTL_MINUTES = 360 // 6 hours
 const LOCK_DURATION_MINUTES = 10
@@ -136,6 +138,51 @@ export async function GET(request: NextRequest) {
               continue
             }
 
+            // Skip discovery if zone already has dispensaries (saves Places API calls)
+            const { data: existingLinks } = await supabaseAdmin
+              .from('zone_dispensaries')
+              .select('dispensary_id')
+              .eq('zone_id', zone.id)
+              .limit(1)
+
+            if (existingLinks && existingLinks.length > 0) {
+              // Zone already populated: skip Places, still create DEALS_READY and refresh zone
+              const { data: subscriptions } = await supabaseAdmin
+                .from('user_subscriptions')
+                .select('email')
+                .eq('zone_id', zone.id)
+                .limit(1000)
+
+              if (subscriptions && subscriptions.length > 0) {
+                const notifications = subscriptions.map((sub) => ({
+                  email: sub.email,
+                  zone_id: zone.id,
+                  type: 'DEALS_READY' as const,
+                  status: 'PENDING' as const,
+                }))
+                await supabaseAdmin
+                  .from('notifications_outbox')
+                  .upsert(notifications, {
+                    onConflict: 'email,zone_id,type',
+                    ignoreDuplicates: true,
+                  })
+              }
+
+              await supabaseAdmin
+                .from('zones')
+                .update({
+                  last_processed_at: new Date().toISOString(),
+                  next_process_at: new Date(Date.now() + zone.ttl_minutes * 60 * 1000).toISOString(),
+                  processing_lock: null,
+                  processing_lock_expires_at: null,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', zone.id)
+
+              processed++
+              continue
+            }
+
             // Discover dispensaries via Google Places
             const radiusMeters = DEFAULT_RADIUS_MILES * 1609.34 // Convert miles to meters
             const places = await searchDispensariesNearLocation(
@@ -163,6 +210,7 @@ export async function GET(request: NextRequest) {
 
             // Upsert dispensaries and link to zone
             let dispensariesLinked = 0
+            const newlyInsertedDispensaries: DispensaryForIngest[] = []
             for (const place of places) {
               // Get additional details if needed (website, phone)
               let placeDetails = place
@@ -250,6 +298,11 @@ export async function GET(request: NextRequest) {
                 }
 
                 dispensaryId = newDisp.id
+                newlyInsertedDispensaries.push({
+                  name: placeDetails.name,
+                  city: zipLocation.city || undefined,
+                  website: placeDetails.website || undefined,
+                })
               }
 
               // Link dispensary to zone
@@ -304,6 +357,13 @@ export async function GET(request: NextRequest) {
                 updated_at: new Date().toISOString(),
               })
               .eq('id', zone.id)
+
+            // Inline deal ingestion for newly discovered dispensaries (don't wait for 8am ingest-daily)
+            const ingestConcurrency = 3
+            for (let i = 0; i < newlyInsertedDispensaries.length; i += ingestConcurrency) {
+              const batch = newlyInsertedDispensaries.slice(i, i + ingestConcurrency)
+              await Promise.allSettled(batch.map((d) => ingestDealsForDispensary(d)))
+            }
 
             processed++
           } catch (error) {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { getDispensariesNearZip } from '@/lib/dispensary-discovery'
+import { ingestDealsForDispensary, updateDispensaryStats } from '@/lib/ingest-deals'
 import * as Sentry from "@sentry/nextjs"
 
 export const dynamic = 'force-dynamic'
@@ -104,6 +105,37 @@ export async function GET(request: NextRequest) {
           }
         }
 
+        // Also include dispensaries from zone_dispensaries for zones with user_subscriptions
+        // (covers zones we discovered but that might not be in getDispensariesNearZip for a given zip/radius)
+        const { data: zonesWithUsers } = await supabaseAdmin
+          .from('user_subscriptions')
+          .select('zone_id')
+        const zoneIds = [...new Set((zonesWithUsers || []).map((r) => r.zone_id))]
+        if (zoneIds.length > 0) {
+          const { data: zdRows } = await supabaseAdmin
+            .from('zone_dispensaries')
+            .select('dispensary_id')
+            .in('zone_id', zoneIds)
+          const dispensaryIds = [...new Set((zdRows || []).map((r) => r.dispensary_id))]
+          if (dispensaryIds.length > 0) {
+            const { data: zoneDispensaries } = await supabaseAdmin
+              .from('dispensaries')
+              .select('name, city, flyer_url, website')
+              .in('id', dispensaryIds)
+              .eq('active', true)
+            for (const d of zoneDispensaries || []) {
+              if (!dispensariesToProcess.has(d.name)) {
+                dispensariesToProcess.set(d.name, {
+                  name: d.name,
+                  city: d.city,
+                  flyer_url: d.flyer_url || undefined,
+                  website: d.website || undefined,
+                })
+              }
+            }
+          }
+        }
+
         // Also get dispensaries that are active but might not have users yet (for initial setup)
         const { data: allActiveDispensaries } = await supabaseAdmin
           .from('dispensaries')
@@ -175,127 +207,15 @@ export async function GET(request: NextRequest) {
 
         for (let i = 0; i < dispensaries.length; i += concurrency) {
           const batch = dispensaries.slice(i, i + concurrency)
-          
+
           await Promise.all(batch.map(async (dispensary) => {
             try {
-              let dealsFromThisDispensary = 0
-
-              // Try flyer and website extraction in parallel for faster processing
-              const [flyerResult, websiteResult] = await Promise.allSettled([
-                // Flyer ingestion (if available)
-                dispensary.flyer_url ? (async () => {
-                  try {
-                    // Step 1: Fetch flyer
-                    const fetchResponse = await fetch(`${process.env.APP_URL}/api/ingest/fetch`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        dispensary_name: dispensary.name,
-                        source_url: dispensary.flyer_url,
-                      }),
-                    })
-
-                    if (!fetchResponse.ok) return 0
-                    const fetchData = await fetchResponse.json()
-                    if (fetchData.skipped) return 0
-
-                    // Step 2: OCR
-                    const ocrResponse = await fetch(`${process.env.APP_URL}/api/ingest/ocr`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        file_path: fetchData.file_path,
-                      }),
-                    })
-
-                    if (!ocrResponse.ok) return 0
-                    const ocrData = await ocrResponse.json()
-
-                    // Step 3: Parse
-                    const parseResponse = await fetch(`${process.env.APP_URL}/api/ingest/parse`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        ocr_text: ocrData.text,
-                        dispensary_name: dispensary.name,
-                        city: dispensary.city,
-                        source_url: dispensary.flyer_url,
-                      }),
-                    })
-
-                    if (!parseResponse.ok) return 0
-                    const parseData = await parseResponse.json()
-                    return parseData.deals_inserted || 0
-                  } catch (error) {
-                    const { logger } = Sentry;
-                    logger.warn("Flyer ingestion failed", {
-                      dispensary: dispensary.name,
-                      error: error instanceof Error ? error.message : 'Unknown error',
-                    });
-                    return 0
-                  }
-                })() : Promise.resolve(0),
-
-                // Website extraction (if available)
-                dispensary.website ? (async () => {
-                  try {
-                    const website = dispensary.website! // TypeScript: we know it's defined from the check above
-                    // Try common deals page paths
-                    const possibleUrls = [
-                      website.endsWith('/') ? website + 'deals' : website + '/deals',
-                      website.endsWith('/') ? website + 'specials' : website + '/specials',
-                      website.endsWith('/') ? website + 'menu' : website + '/menu',
-                      website, // Fallback to homepage
-                    ]
-
-                    for (const url of possibleUrls) {
-                      try {
-                        const websiteResponse = await fetch(`${process.env.APP_URL}/api/ingest/website-deals`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            dispensary_name: dispensary.name,
-                            website_url: url,
-                            city: dispensary.city,
-                          }),
-                        })
-
-                        if (websiteResponse.ok) {
-                          const websiteData = await websiteResponse.json()
-                          if (websiteData.deals_inserted > 0) {
-                            return websiteData.deals_inserted || 0
-                          }
-                        }
-                      } catch (urlError) {
-                        // Try next URL
-                        continue
-                      }
-                    }
-                    return 0
-              } catch (error) {
-                const { logger } = Sentry;
-                logger.warn("Website extraction failed", {
-                  dispensary: dispensary.name,
-                  error: error instanceof Error ? error.message : 'Unknown error',
-                });
-                return 0
-              }
-                })() : Promise.resolve(0),
-              ])
-
-              // Sum up deals from both sources
-              if (flyerResult.status === 'fulfilled') {
-                dealsFromThisDispensary += flyerResult.value
-              }
-              if (websiteResult.status === 'fulfilled') {
-                dealsFromThisDispensary += websiteResult.value
-              }
+              const dealsFromThisDispensary = await ingestDealsForDispensary(dispensary)
 
               if (dealsFromThisDispensary > 0) {
                 dealsInserted += dealsFromThisDispensary
                 processed++
                 successCounts.set(dispensary.name, (successCounts.get(dispensary.name) || 0) + 1)
-                await updateDispensaryStats(dispensary.name, true)
               } else {
                 if (!dispensary.flyer_url && !dispensary.website) {
                   const { logger } = Sentry;
@@ -304,10 +224,8 @@ export async function GET(request: NextRequest) {
                   });
                   skipped++
                 } else {
-                  // Had sources but failed to extract deals
                   failed++
                   failureCounts.set(dispensary.name, (failureCounts.get(dispensary.name) || 0) + 1)
-                  await updateDispensaryStats(dispensary.name, false)
                 }
               }
             } catch (error) {
@@ -386,54 +304,4 @@ export async function GET(request: NextRequest) {
       }
     }
   );
-}
-
-/**
- * Update dispensary ingestion statistics
- */
-async function updateDispensaryStats(dispensaryName: string, success: boolean): Promise<void> {
-  try {
-    // Get current stats
-    const { data: dispensary } = await supabaseAdmin
-      .from('dispensaries')
-      .select('ingestion_success_rate, last_ingested_at')
-      .eq('name', dispensaryName)
-      .single()
-
-    if (!dispensary) return
-
-    // Calculate new success rate (simple moving average)
-    const currentRate = dispensary.ingestion_success_rate || 1.0
-    const newRate = success 
-      ? Math.min(1.0, currentRate + 0.1) // Increase on success
-      : Math.max(0.0, currentRate - 0.2) // Decrease more on failure
-
-    // Auto-disable if success rate drops below 0.3
-    const shouldBeActive = newRate >= 0.3
-
-    await supabaseAdmin
-      .from('dispensaries')
-      .update({
-        last_ingested_at: new Date().toISOString(),
-        ingestion_success_rate: newRate,
-        active: shouldBeActive,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('name', dispensaryName)
-  } catch (error) {
-    const { logger } = Sentry;
-    logger.error("Error updating dispensary stats", {
-      dispensary: dispensaryName,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-
-    Sentry.captureException(error instanceof Error ? error : new Error(String(error)), {
-      tags: {
-        operation: "update_dispensary_stats",
-      },
-      extra: {
-        dispensary: dispensaryName,
-      },
-    });
-  }
 }

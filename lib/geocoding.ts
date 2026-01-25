@@ -1,3 +1,5 @@
+import * as Sentry from '@sentry/nextjs'
+
 /**
  * Geocoding utilities for finding dispensaries by location
  */
@@ -19,9 +21,15 @@ interface GeocodeResult {
  */
 export async function geocodeZip(zip: string): Promise<GeocodeResult | null> {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY
-  
+
   if (!apiKey) {
-    console.warn('GOOGLE_MAPS_API_KEY not configured, skipping geocoding')
+    const { logger } = Sentry
+    logger.warn('GOOGLE_MAPS_API_KEY not configured, skipping geocoding', { zip })
+    Sentry.captureMessage('GOOGLE_MAPS_API_KEY not configured; geocoding skipped', {
+      level: 'warning',
+      tags: { feature: 'geocoding' },
+      extra: { zip },
+    })
     return null
   }
 
@@ -31,19 +39,27 @@ export async function geocodeZip(zip: string): Promise<GeocodeResult | null> {
     )
 
     if (!response.ok) {
-      throw new Error(`Geocoding API error: ${response.status}`)
+      const err = new Error(`Geocoding API error: ${response.status}`)
+      Sentry.captureException(err, { tags: { feature: 'geocoding' }, extra: { zip, status: response.status } })
+      return null
     }
 
     const data = await response.json()
 
     if (data.status !== 'OK' || !data.results || data.results.length === 0) {
-      console.warn(`Geocoding failed for zip ${zip}: ${data.status}`)
+      const { logger } = Sentry
+      logger.warn('Geocoding failed for zip', { zip, status: data.status })
+      Sentry.captureMessage('Geocoding returned no results for zip', {
+        level: 'warning',
+        tags: { feature: 'geocoding' },
+        extra: { zip, status: data.status, error_message: data.error_message },
+      })
       return null
     }
 
     const location = data.results[0].geometry.location
     const addressComponents = data.results[0].address_components || []
-    
+
     let city: string | undefined
     let state: string | undefined
 
@@ -63,7 +79,12 @@ export async function geocodeZip(zip: string): Promise<GeocodeResult | null> {
       state,
     }
   } catch (error) {
-    console.error('Geocoding error:', error)
+    const { logger } = Sentry
+    logger.error('Geocoding error', { zip, error: error instanceof Error ? error.message : String(error) })
+    Sentry.captureException(error instanceof Error ? error : new Error(String(error)), {
+      tags: { feature: 'geocoding' },
+      extra: { zip },
+    })
     return null
   }
 }

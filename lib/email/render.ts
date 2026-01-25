@@ -1,5 +1,73 @@
 import { createHash } from 'crypto'
 
+/** Deal shape from Supabase (deals + brands) used for daily emails */
+export type DealForEmail = {
+  dispensary_name: string
+  title: string
+  product_name?: string | null
+  price_text: string
+  city: string | null
+  source_url: string | null
+  brands?: { name: string } | null
+}
+
+/**
+ * Build variables for the Resend deals template (lib/email/deals-template.html).
+ * Use with resend.emails.send({ template: { id: RESEND_DEALS_TEMPLATE_ID, variables } }).
+ * Template variables: ZONE_NAME, FORMATTED_DATE, DEALS_HTML, UNSUBSCRIBE_LINK.
+ */
+export function buildDealsTemplateVariables(
+  deals: DealForEmail[],
+  zoneZip: string,
+  userEmail: string,
+  appUrl: string,
+  dateStr: string // YYYY-MM-DD
+): { ZONE_NAME: string; FORMATTED_DATE: string; DEALS_HTML: string; UNSUBSCRIBE_LINK: string } {
+  const unsubscribeToken = createHash('sha256')
+    .update(`${userEmail}:${process.env.UNSUBSCRIBE_SECRET || 'change-me-in-production'}`)
+    .digest('hex')
+    .substring(0, 16)
+  const UNSUBSCRIBE_LINK = `${appUrl}/api/unsubscribe?email=${encodeURIComponent(userEmail)}&token=${unsubscribeToken}`
+
+  const date = new Date(dateStr + 'T12:00:00Z')
+  const FORMATTED_DATE = date.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+
+  const DEALS_HTML =
+    deals.length === 0
+      ? '<p style="padding: 20px; text-align: center; color: #555;">No deals in this zone today — check back soon!</p>'
+      : deals
+          .map((deal) => {
+            const brandName = deal.brands?.name
+            const title = brandName && deal.product_name ? `${brandName} ${deal.product_name}` : deal.title
+            const description = [deal.dispensary_name, deal.city].filter(Boolean).join(' • ') || deal.dispensary_name
+            const ctaUrl = deal.source_url || ''
+            const ctaText = 'Verify Deal'
+            const ctaBlock =
+              ctaUrl && ctaText
+                ? `<a href="${escapeHtml(ctaUrl)}" class="btn">${escapeHtml(ctaText)}</a>`
+                : ''
+            return `<div class="deal"><p class="deal-title">${escapeHtml(title)}</p><p class="deal-details">${escapeHtml(description)}</p><p class="deal-price">${escapeHtml(deal.price_text)}</p>${ctaBlock}</div>`
+          })
+          .join('')
+
+  return {
+    ZONE_NAME: zoneZip,
+    FORMATTED_DATE,
+    DEALS_HTML,
+    UNSUBSCRIBE_LINK,
+  }
+}
+
+/** Subject line for daily deals emails */
+export function getDealsEmailSubject(dealCount: number): string {
+  return `Today's Dispo Deals - ${dealCount} ${dealCount === 1 ? 'Deal' : 'Deals'} for You`
+}
+
 export function renderWelcomeEmail(userEmail: string, appUrl: string): { subject: string; html: string } {
   const subject = 'Welcome to Daily Dispo Deals'
   const html = `

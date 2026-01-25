@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs'
 import { geocodeZip, calculateDistance } from './geocoding'
 import { supabaseAdmin } from './supabase/server'
 
@@ -21,9 +22,15 @@ export async function discoverDispensariesForZip(
 ): Promise<DispensaryCandidate[]> {
   // Geocode the zip code
   const zipLocation = await geocodeZip(zip)
-  
+
   if (!zipLocation) {
-    console.warn(`Could not geocode zip ${zip}`)
+    const { logger } = Sentry
+    logger.warn('Could not geocode zip; discover aborted', { zip })
+    Sentry.captureMessage('Dispensary discovery aborted: could not geocode zip', {
+      level: 'warning',
+      tags: { feature: 'dispensary_discovery' },
+      extra: { zip, radiusMiles },
+    })
     return []
   }
 
@@ -35,7 +42,8 @@ export async function discoverDispensariesForZip(
     .eq('active', true)
 
   if (existing && existing.length > 0) {
-    // Already have dispensaries for this zip, return them
+    const { logger } = Sentry
+    logger.info('Dispensaries found in DB for zip', { zip, count: existing.length })
     return existing.map(d => ({
       name: d.name,
       city: d.city,
@@ -50,7 +58,13 @@ export async function discoverDispensariesForZip(
   // No existing dispensaries for this zip - discover via Google Places
   const apiKey = process.env.GOOGLE_MAPS_API_KEY
   if (!apiKey) {
-    console.warn('GOOGLE_MAPS_API_KEY not configured, skipping dispensary discovery')
+    const { logger } = Sentry
+    logger.warn('GOOGLE_MAPS_API_KEY not configured, skipping dispensary discovery', { zip })
+    Sentry.captureMessage('GOOGLE_MAPS_API_KEY not configured; Places discovery skipped', {
+      level: 'warning',
+      tags: { feature: 'dispensary_discovery' },
+      extra: { zip },
+    })
     return []
   }
 
@@ -64,15 +78,25 @@ export async function discoverDispensariesForZip(
 
     const response = await fetch(url.toString())
     if (!response.ok) {
-      console.error('Places API error:', response.status, response.statusText)
+      const { logger } = Sentry
+      logger.error('Places API error', { status: response.status, statusText: response.statusText, zip })
+      Sentry.captureException(new Error(`Places API error: ${response.status} ${response.statusText}`), {
+        tags: { feature: 'dispensary_discovery' },
+        extra: { zip, radiusMiles, status: response.status },
+      })
       return []
     }
 
     const data = await response.json()
 
     if (data.status && data.status !== 'OK') {
-      console.warn('Places API non-OK status:', data.status, data.error_message)
-      // Handle quota / rate limit style errors gracefully
+      const { logger } = Sentry
+      logger.warn('Places API non-OK status', { status: data.status, error_message: data.error_message, zip })
+      Sentry.captureMessage('Places API returned non-OK status', {
+        level: 'warning',
+        tags: { feature: 'dispensary_discovery', places_status: data.status },
+        extra: { zip, radiusMiles, status: data.status, error_message: data.error_message },
+      })
       if (data.status === 'OVER_QUERY_LIMIT' || data.status === 'RESOURCE_EXHAUSTED') {
         return []
       }
@@ -119,9 +143,19 @@ export async function discoverDispensariesForZip(
       await addDispensary(candidate)
     }
 
+    const { logger } = Sentry
+    logger.info('Places discovery completed', { zip, radiusMiles, found: candidates.length })
     return candidates
   } catch (error) {
-    console.error('Error discovering dispensaries via Places API:', error)
+    const { logger } = Sentry
+    logger.error('Error discovering dispensaries via Places API', {
+      zip,
+      error: error instanceof Error ? error.message : String(error),
+    })
+    Sentry.captureException(error instanceof Error ? error : new Error(String(error)), {
+      tags: { feature: 'dispensary_discovery' },
+      extra: { zip, radiusMiles },
+    })
     return []
   }
 }
@@ -199,8 +233,10 @@ export async function getDispensariesNearZip(
   radiusMiles: number
 ): Promise<Array<{ id: string; name: string; city?: string; zip?: string; flyer_url?: string; weedmaps_url?: string }>> {
   const zipLocation = await geocodeZip(zip)
-  
+
   if (!zipLocation) {
+    const { logger } = Sentry
+    logger.warn('getDispensariesNearZip: geocode failed, returning []', { zip })
     return []
   }
 
@@ -211,7 +247,12 @@ export async function getDispensariesNearZip(
     .eq('active', true)
 
   if (error || !dispensaries) {
-    console.error('Error fetching dispensaries:', error)
+    const { logger } = Sentry
+    logger.error('Error fetching dispensaries', { zip, error: error?.message })
+    Sentry.captureException(error || new Error('No dispensaries data'), {
+      tags: { feature: 'dispensary_discovery' },
+      extra: { zip, radiusMiles },
+    })
     return []
   }
 
@@ -236,6 +277,16 @@ export async function getDispensariesNearZip(
       weedmaps_url: d.weedmaps_url,
     }))
 
+  const { logger } = Sentry
+  if (dispensaries.length > 0 && nearby.length === 0) {
+    logger.info('Dispensaries in DB but none within radius', {
+      zip,
+      radiusMiles,
+      totalInDb: dispensaries.length,
+    })
+  } else {
+    logger.info('getDispensariesNearZip result', { zip, radiusMiles, nearby: nearby.length, totalInDb: dispensaries.length })
+  }
   return nearby
 }
 

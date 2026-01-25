@@ -2,7 +2,6 @@ import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { getOrCreateAuthUser } from '@/lib/auth-helpers'
-import { getDispensariesNearZip } from '@/lib/dispensary-discovery'
 import { rateLimit } from '@/lib/rate-limit'
 import * as Sentry from "@sentry/nextjs"
 import {
@@ -240,35 +239,6 @@ export async function POST(request: NextRequest) {
           .lt('next_process_at', new Date().toISOString())
           .or('next_process_at.is.null')
       }
-
-      // Also discover dispensaries in that area (runs asynchronously)
-      getDispensariesNearZip(validated.zip, validated.radius)
-        .then(dispensaries => {
-          const { logger } = Sentry;
-          logger.info("Found dispensaries near zip", {
-            zip: validated.zip,
-            count: dispensaries.length,
-          });
-          // Dispensaries are already in database, just ensuring they're tracked
-        })
-        .catch(error => {
-          const { logger } = Sentry;
-          logger.error("Error discovering dispensaries", {
-            error: error instanceof Error ? error.message : 'Unknown error',
-            zip: validated.zip,
-          });
-
-          Sentry.captureException(error instanceof Error ? error : new Error(String(error)), {
-            tags: {
-              operation: "discover_dispensaries",
-            },
-            extra: {
-              zip: validated.zip,
-              radius: validated.radius,
-            },
-          });
-          // Don't fail the request if discovery fails
-        })
     }
 
     return success({ ok: true })
