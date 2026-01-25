@@ -69,14 +69,15 @@ export async function POST(request: NextRequest) {
     }
 
     const baseUrl = process.env.APP_URL || 'http://localhost:3000'
-    const authHeader = process.env.INGESTION_CRON_SECRET
-      ? { Authorization: `Bearer ${process.env.INGESTION_CRON_SECRET}` }
-      : {}
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (process.env.INGESTION_CRON_SECRET) {
+      headers.Authorization = `Bearer ${process.env.INGESTION_CRON_SECRET}`
+    }
 
     // 1. Fetch: download and store flyer
     const fetchRes = await fetch(`${baseUrl}/api/ingest/fetch`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeader },
+      headers,
       body: JSON.stringify({
         dispensary_name: dispensaryName,
         source_url: validated.source_url,
@@ -100,7 +101,7 @@ export async function POST(request: NextRequest) {
     // 2. OCR
     const ocrRes = await fetch(`${baseUrl}/api/ingest/ocr`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeader },
+      headers,
       body: JSON.stringify({ file_path: filePath }),
     })
     const ocrData = await ocrRes.json()
@@ -118,7 +119,7 @@ export async function POST(request: NextRequest) {
     // 3. Parse
     const parseRes = await fetch(`${baseUrl}/api/ingest/parse`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeader },
+      headers,
       body: JSON.stringify({
         ocr_text: ocrText,
         dispensary_name: dispensaryName,
