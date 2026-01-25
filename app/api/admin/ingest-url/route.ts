@@ -8,6 +8,8 @@ import { success, unauthorized, validationError, serverError } from '@/lib/api-r
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
+const FLYER_EXT = /\.(pdf|png|jpg|jpeg|webp|gif)(\?|$)/i
+
 const schema = z.object({
   source_url: z.string().url(),
   dispensary_name: z.string().min(1).optional(),
@@ -19,13 +21,15 @@ const schema = z.object({
 
 /**
  * POST /api/admin/ingest-url
- * Admin-only: Run fetch -> OCR -> parse for a flyer/deals URL tied to a dispensary.
+ * Admin-only: Ingest deals from a URL tied to a dispensary.
+ *
+ * - HTML deal pages (e.g. https://bowdega.com/deals): use website-deals (1 Gemini call to
+ *   extract from HTML). Saves cost vs fetch→OCR→parse and works correctly for direct site URLs.
+ * - Image/PDF flyers (.pdf, .png, .jpg, .jpeg, .webp, .gif): use fetch → OCR → parse (2 AI calls).
+ *
  * Body: source_url (required), and either dispensary_id or dispensary_name.
- * Optional: dispensary_city — when using dispensary_name, name+city gives a precise match
- * (e.g. when multiple dispensaries share a name). A future Weedmaps flyer resolver
- * would also use name+city to look up the deals page.
- * Uses internal fetch to /api/ingest/fetch, /api/ingest/ocr, /api/ingest/parse with
- * Bearer INGESTION_CRON_SECRET to bypass rate limits.
+ * Optional: dispensary_city for precise match when using dispensary_name.
+ * Uses Bearer INGESTION_CRON_SECRET when calling internal ingest routes to bypass rate limits.
  */
 export async function POST(request: NextRequest) {
   const session = await getAdminSession()
@@ -53,7 +57,6 @@ export async function POST(request: NextRequest) {
       city = disp.city ?? null
     } else {
       dispensaryName = validated.dispensary_name!
-      // Optional: use name+city for a more precise match when multiple dispensaries share a name
       let q = supabaseAdmin.from('dispensaries').select('name, city').eq('name', dispensaryName)
       if (validated.dispensary_city) {
         q = q.eq('city', validated.dispensary_city)
@@ -63,7 +66,6 @@ export async function POST(request: NextRequest) {
         dispensaryName = disp.name
         city = disp.city ?? null
       } else {
-        // Not in DB: use provided name and optional city for fetch/parse; updateDispensaryStats will no-op
         city = validated.dispensary_city ?? null
       }
     }
@@ -74,7 +76,38 @@ export async function POST(request: NextRequest) {
       headers.Authorization = `Bearer ${process.env.INGESTION_CRON_SECRET}`
     }
 
-    // 1. Fetch: download and store flyer
+    const looksLikeFlyer = FLYER_EXT.test(new URL(validated.source_url).pathname)
+
+    if (!looksLikeFlyer) {
+      // HTML deals page: fetch HTML and extract with one Gemini call (website-deals). No OCR.
+      const webRes = await fetch(`${baseUrl}/api/ingest/website-deals`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          dispensary_name: dispensaryName,
+          website_url: validated.source_url,
+          city: city ?? undefined,
+        }),
+      })
+      const webData = await webRes.json()
+      if (!webRes.ok) {
+        return NextResponse.json(
+          { error: webData?.error || 'Website extraction failed', details: webData?.details },
+          { status: webRes.status }
+        )
+      }
+      const dealsInserted = webData.deals_inserted ?? 0
+      await updateDispensaryStats(dispensaryName, dealsInserted > 0)
+      return success({
+        deals_inserted: dealsInserted,
+        deals: webData.deals ?? [],
+        low_confidence_handled: 0,
+        flagged_for_review: webData.flagged_for_review ?? 0,
+        source: 'website',
+      })
+    }
+
+    // Flyer path: fetch → OCR → parse
     const fetchRes = await fetch(`${baseUrl}/api/ingest/fetch`, {
       method: 'POST',
       headers,
@@ -98,7 +131,6 @@ export async function POST(request: NextRequest) {
       return serverError('Fetch did not return file_path')
     }
 
-    // 2. OCR
     const ocrRes = await fetch(`${baseUrl}/api/ingest/ocr`, {
       method: 'POST',
       headers,
@@ -116,7 +148,6 @@ export async function POST(request: NextRequest) {
       return serverError('OCR did not return text')
     }
 
-    // 3. Parse
     const parseRes = await fetch(`${baseUrl}/api/ingest/parse`, {
       method: 'POST',
       headers,
@@ -143,6 +174,7 @@ export async function POST(request: NextRequest) {
       deals: parseData.deals,
       low_confidence_handled: parseData.low_confidence_handled,
       flagged_for_review: parseData.flagged_for_review,
+      source: 'flyer',
     })
   } catch (error) {
     if (error instanceof z.ZodError) {
