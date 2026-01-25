@@ -34,9 +34,15 @@ serve(async (req) => {
       )
     }
 
-    if (radius && ![5, 10, 25].includes(radius)) {
+    if (!zip || !String(zip).trim()) {
       return new Response(
-        JSON.stringify({ error: 'Radius must be 5, 10, or 25' }),
+        JSON.stringify({ error: 'Zip code is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+    if (!radius || ![5, 10, 25].includes(Number(radius))) {
+      return new Response(
+        JSON.stringify({ error: 'Search radius is required (5, 10, or 25 miles)' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -83,8 +89,8 @@ serve(async (req) => {
         user_id: user.id,
         categories,
         brands: brands || [],
-        zip: zip || null,
-        radius: radius || null,
+        zip: String(zip).trim(),
+        radius: Number(radius),
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'user_id',

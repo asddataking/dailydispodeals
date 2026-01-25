@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabase/server'
+import { getOrCreateAuthUser } from '@/lib/auth-helpers'
 import { getDispensariesNearZip } from '@/lib/dispensary-discovery'
 import { rateLimit } from '@/lib/rate-limit'
 import * as Sentry from "@sentry/nextjs"
@@ -17,9 +18,9 @@ export const runtime = 'nodejs'
 const schema = z.object({
   email: z.string().email(),
   categories: z.array(z.string()).min(1),
-  brands: z.array(z.string()).optional(), // Optional brand preferences
-  zip: z.string().optional(),
-  radius: z.union([z.literal(5), z.literal(10), z.literal(25)]).optional(),
+  brands: z.array(z.string()).optional(),
+  zip: z.string().min(1, 'Zip code is required'),
+  radius: z.union([z.literal(5), z.literal(10), z.literal(25)]),
 })
 
 export async function POST(request: NextRequest) {
@@ -34,14 +35,34 @@ export async function POST(request: NextRequest) {
     const validated = schema.parse(body)
 
     // Find user by email
-    const { data: user, error: userError } = await supabaseAdmin
+    let { data: user, error: userError } = await supabaseAdmin
       .from('users')
       .select('id')
       .eq('email', validated.email)
       .single()
 
+    // If user not found, try to create from Supabase Auth (handles webhook delay/edge cases)
+    if ((userError || !user)) {
+      try {
+        const authUserId = await getOrCreateAuthUser(validated.email)
+        await supabaseAdmin.from('users').upsert(
+          { id: authUserId, email: validated.email },
+          { onConflict: 'id' }
+        )
+        const res = await supabaseAdmin
+          .from('users')
+          .select('id')
+          .eq('email', validated.email)
+          .single()
+        user = res.data
+        userError = res.error
+      } catch {
+        // ignore
+      }
+    }
+
     if (userError || !user) {
-      return validationError('User not found')
+      return validationError('Your account is still being set up. Please wait a few seconds and try again.')
     }
 
     // Check user has active subscription
@@ -54,7 +75,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (!subscription) {
-      return validationError('No active subscription found')
+      return validationError('No active subscription found. If you just completed checkout, please wait a few seconds and try again.')
     }
 
     // Upsert preferences

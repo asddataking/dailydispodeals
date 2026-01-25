@@ -28,14 +28,28 @@ export async function POST(request: NextRequest) {
         )
       }
 
+      // Prefer STRIPE_TEST_WEBHOOK_SECRET in test mode if set; otherwise STRIPE_WEBHOOK_SECRET.
+      // If test and live use the same signing secret, set only STRIPE_WEBHOOK_SECRET.
+      const useTestKeys = !!process.env.STRIPE_TEST_SK_KEY
+      const webhookSecret = (useTestKeys && process.env.STRIPE_TEST_WEBHOOK_SECRET)
+        ? process.env.STRIPE_TEST_WEBHOOK_SECRET
+        : process.env.STRIPE_WEBHOOK_SECRET
+
+      if (!webhookSecret) {
+        const { logger } = Sentry
+        logger.error("Webhook secret not configured", { useTestKeys })
+        span.setAttribute("error", true)
+        span.setAttribute("error_type", "missing_webhook_secret")
+        return NextResponse.json(
+          { error: 'Checkout not configured - set STRIPE_WEBHOOK_SECRET in Vercel (and STRIPE_TEST_WEBHOOK_SECRET only if test uses a different signing secret)' },
+          { status: 500 }
+        )
+      }
+
       let event: Stripe.Event
 
       try {
-        event = stripe.webhooks.constructEvent(
-          body,
-          signature,
-          process.env.STRIPE_WEBHOOK_SECRET!
-        )
+        event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
         
         span.setAttribute("event_type", event.type);
         span.setAttribute("event_id", event.id);

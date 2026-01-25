@@ -26,7 +26,7 @@ export function PreferencesModal({ open, onOpenChange, email }: PreferencesModal
   const [selectedBrands, setSelectedBrands] = useState<string[]>([])
   const [availableBrands, setAvailableBrands] = useState<Array<{ id: string; name: string }>>([])
   const [zip, setZip] = useState('')
-  const [radius, setRadius] = useState<5 | 10 | 25 | undefined>(undefined)
+  const [radius, setRadius] = useState<5 | 10 | 25>(10)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -83,6 +83,14 @@ export function PreferencesModal({ open, onOpenChange, email }: PreferencesModal
       setError('Please select at least one category')
       return
     }
+    if (!zip.trim()) {
+      setError('Please enter your zip code')
+      return
+    }
+    if (!radius) {
+      setError('Please select a search radius')
+      return
+    }
 
     setLoading(true)
     setError(null)
@@ -96,8 +104,8 @@ export function PreferencesModal({ open, onOpenChange, email }: PreferencesModal
           email,
           categories: selectedCategories,
           brands: selectedBrands.length > 0 ? selectedBrands : undefined,
-          zip: zip || undefined,
-          radius: radius || undefined,
+          zip: zip.trim(),
+          radius,
         })
       } catch (edgeError) {
         // Fallback to API route
@@ -109,8 +117,8 @@ export function PreferencesModal({ open, onOpenChange, email }: PreferencesModal
             email,
             categories: selectedCategories,
             brands: selectedBrands.length > 0 ? selectedBrands : undefined,
-            zip: zip || undefined,
-            radius: radius || undefined,
+            zip: zip.trim(),
+            radius,
           }),
         })
         
@@ -221,35 +229,33 @@ export function PreferencesModal({ open, onOpenChange, email }: PreferencesModal
 
                 <div>
                   <label htmlFor="zip" className="block text-sm font-medium text-gray-700 mb-2">
-                    Zip Code (optional)
+                    Zip Code <span className="text-red-500">*</span>
                   </label>
                   <input
                     id="zip"
                     type="text"
                     value={zip}
                     onChange={(e) => setZip(e.target.value)}
+                    required
                     className="w-full px-4 py-3 text-base border border-gray-300 rounded-md focus:ring-2 focus:ring-lake-blue-600 focus:border-transparent"
                     placeholder="48000"
                   />
                 </div>
 
-                {zip && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Search Radius (optional)
-                    </label>
-                    <select
-                      value={radius || ''}
-                      onChange={(e) => setRadius(e.target.value ? Number(e.target.value) as 5 | 10 | 25 : undefined)}
-                      className="w-full px-4 py-3 text-base border border-gray-300 rounded-md focus:ring-2 focus:ring-lake-blue-600 focus:border-transparent"
-                    >
-                      <option value="">No radius limit</option>
-                      <option value="5">5 miles</option>
-                      <option value="10">10 miles</option>
-                      <option value="25">25 miles</option>
-                    </select>
-                  </div>
-                )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Search Radius <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={radius}
+                    onChange={(e) => setRadius(Number(e.target.value) as 5 | 10 | 25)}
+                    className="w-full px-4 py-3 text-base border border-gray-300 rounded-md focus:ring-2 focus:ring-lake-blue-600 focus:border-transparent"
+                  >
+                    <option value="5">5 miles</option>
+                    <option value="10">10 miles</option>
+                    <option value="25">25 miles</option>
+                  </select>
+                </div>
 
                 {error && (
                   <div className="text-red-600 text-sm">{error}</div>
@@ -257,7 +263,7 @@ export function PreferencesModal({ open, onOpenChange, email }: PreferencesModal
 
                 <button
                   type="submit"
-                  disabled={loading || selectedCategories.length === 0}
+                  disabled={loading || selectedCategories.length === 0 || !zip.trim() || !radius}
                   className="w-full bg-lake-blue-700 text-white py-3 rounded-md font-semibold hover:bg-lake-blue-800 disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px] text-base"
                 >
                   {loading ? 'Saving...' : 'Save Preferences'}
