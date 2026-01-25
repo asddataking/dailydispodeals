@@ -7,10 +7,10 @@ function getStripe(): Stripe {
     return stripeInstance
   }
 
-  const secretKey = process.env.STRIPE_SECRET_KEY
+  const secretKey = process.env.STRIPE_TEST_SK_KEY || process.env.STRIPE_SECRET_KEY
 
   if (!secretKey) {
-    throw new Error('STRIPE_SECRET_KEY is not configured')
+    throw new Error('STRIPE_TEST_SK_KEY or STRIPE_SECRET_KEY is not configured')
   }
 
   stripeInstance = new Stripe(secretKey, {

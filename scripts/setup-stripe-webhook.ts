@@ -18,12 +18,12 @@ import { resolve } from 'path'
 config({ path: resolve(process.cwd(), '.env.local') })
 config() // Fallback to .env
 
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY
+const STRIPE_SECRET_KEY = process.env.STRIPE_TEST_SK_KEY || process.env.STRIPE_SECRET_KEY
 // Default to www.dailydispodeals.com if APP_URL not set
 const APP_URL = process.env.APP_URL || 'https://www.dailydispodeals.com'
 
 if (!STRIPE_SECRET_KEY) {
-  console.error('❌ Error: STRIPE_SECRET_KEY is not set in .env.local')
+  console.error('❌ Error: STRIPE_TEST_SK_KEY or STRIPE_SECRET_KEY is not set in .env.local')
   console.error('   Please add your Stripe secret key to .env.local')
   process.exit(1)
 }

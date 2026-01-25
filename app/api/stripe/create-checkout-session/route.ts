@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
 
     // Fail fast with clear messages if required env is missing (Production)
     const missing: string[] = []
-    if (!process.env.STRIPE_SECRET_KEY) missing.push('STRIPE_SECRET_KEY')
+    if (!process.env.STRIPE_TEST_SK_KEY && !process.env.STRIPE_SECRET_KEY) missing.push('STRIPE_TEST_SK_KEY or STRIPE_SECRET_KEY')
     if (!process.env.STRIPE_MONTHLY_PRICE_ID) missing.push('STRIPE_MONTHLY_PRICE_ID')
     if (!process.env.STRIPE_YEARLY_PRICE_ID) missing.push('STRIPE_YEARLY_PRICE_ID')
     if (!process.env.SUPABASE_URL) missing.push('SUPABASE_URL')
