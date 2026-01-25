@@ -104,6 +104,7 @@ export default function RootLayout({
           `}
         </Script>
         <noscript>
+          {/* eslint-disable-next-line @next/next/no-img-element -- 1x1 Facebook Pixel fallback */}
           <img
             height="1"
             width="1"

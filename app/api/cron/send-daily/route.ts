@@ -289,7 +289,7 @@ export async function GET(request: NextRequest) {
                   appUrl,
                   today
                 )
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Resend API supports template; SDK CreateEmailOptions omits it
+                // Resend API supports template; SDK CreateEmailOptions types omit it.
                 await resend.emails.send({
                   from: 'Daily Dispo Deals <deals@dailydispodeals.com>',
                   to: email,

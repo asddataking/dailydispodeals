@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
     const results: {
       email_logs?: any[]
       ingestion_logs?: any[]
+      ingestion_error?: string
     } = {}
 
     // Email logs
@@ -61,10 +62,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Ingestion logs (from deal_flyers)
+    // Note: ocr_processed_at omitted so this works without migrations 004/008
     if (type === 'ingestion' || type === 'all') {
       const { data: ingestionLogs, error: ingestionError } = await supabaseAdmin
         .from('deal_flyers')
-        .select('dispensary_name, date, file_path, source_url, deals_extracted, processed_at, ocr_processed_at, created_at')
+        .select('dispensary_name, date, file_path, source_url, deals_extracted, processed_at, created_at')
         .gte('date', startDateStr)
         .order('created_at', { ascending: false })
         .limit(1000)
@@ -73,6 +75,8 @@ export async function GET(request: NextRequest) {
         const { logger } = Sentry;
         logger.error("Error fetching ingestion logs", {
           error: ingestionError.message,
+          code: ingestionError.code,
+          details: ingestionError.details,
         });
 
         Sentry.captureException(ingestionError, {
@@ -80,7 +84,14 @@ export async function GET(request: NextRequest) {
             operation: "admin_logs",
             log_type: "ingestion",
           },
+          extra: {
+            supabase_code: ingestionError.code,
+            supabase_message: ingestionError.message,
+            supabase_details: ingestionError.details,
+          },
         });
+        results.ingestion_logs = []
+        results.ingestion_error = ingestionError.message
       } else {
         results.ingestion_logs = ingestionLogs || []
       }

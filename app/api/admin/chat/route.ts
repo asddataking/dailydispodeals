@@ -464,7 +464,7 @@ export async function POST(request: NextRequest) {
 
             const { data: flyers } = await supabaseAdmin
               .from('deal_flyers')
-              .select('dispensary_name, date, deals_extracted, processed_at, ocr_processed_at')
+              .select('dispensary_name, date, deals_extracted, processed_at, created_at')
               .gte('date', startDateStr)
               .order('created_at', { ascending: false })
               .limit(100)

@@ -20,7 +20,6 @@ interface IngestionLog {
   source_url: string
   deals_extracted: number
   processed_at: string | null
-  ocr_processed_at: string | null
   created_at: string
 }
 
@@ -29,6 +28,7 @@ export function LogsViewer() {
   const [days, setDays] = useState(7)
   const [emailLogs, setEmailLogs] = useState<EmailLog[]>([])
   const [ingestionLogs, setIngestionLogs] = useState<IngestionLog[]>([])
+  const [ingestionError, setIngestionError] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const { token } = useAdminAuth()
@@ -43,9 +43,10 @@ export function LogsViewer() {
   const fetchLogs = async () => {
     setLoading(true)
     setError('')
+    setIngestionError('')
     try {
       const { apiFetch, getErrorMessage, isErrorResponse, unwrapApiResponse } = await import('@/lib/api-client')
-      const response = await apiFetch<{ email_logs: EmailLog[]; ingestion_logs: IngestionLog[] }>(`/api/admin/logs?type=${type}&days=${days}`, {
+      const response = await apiFetch<{ email_logs: EmailLog[]; ingestion_logs: IngestionLog[]; ingestion_error?: string }>(`/api/admin/logs?type=${type}&days=${days}`, {
         headers: getAuthHeaders(token),
       })
       
@@ -56,6 +57,7 @@ export function LogsViewer() {
       const data = unwrapApiResponse(response)
       setEmailLogs(data.email_logs || [])
       setIngestionLogs(data.ingestion_logs || [])
+      setIngestionError(data.ingestion_error || '')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load logs')
     } finally {
@@ -162,6 +164,11 @@ export function LogsViewer() {
         <div className="bg-white rounded-lg shadow">
           <div className="px-6 py-4 border-b border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900">Ingestion Logs</h3>
+            {ingestionError && (
+              <p className="mt-2 text-sm text-amber-700 bg-amber-50 px-3 py-2 rounded-md">
+                Ingestion logs could not be loaded: {ingestionError}
+              </p>
+            )}
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
