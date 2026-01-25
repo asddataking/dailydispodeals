@@ -31,11 +31,18 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const validated = schema.parse(body)
 
+    const useTestKeys = !!process.env.STRIPE_TEST_SK_KEY
+
     // Fail fast with clear messages if required env is missing (Production)
     const missing: string[] = []
     if (!process.env.STRIPE_TEST_SK_KEY && !process.env.STRIPE_SECRET_KEY) missing.push('STRIPE_TEST_SK_KEY or STRIPE_SECRET_KEY')
-    if (!process.env.STRIPE_MONTHLY_PRICE_ID) missing.push('STRIPE_MONTHLY_PRICE_ID')
-    if (!process.env.STRIPE_YEARLY_PRICE_ID) missing.push('STRIPE_YEARLY_PRICE_ID')
+    if (useTestKeys) {
+      if (!process.env.STRIPE_TEST_MONTHLY_PRICE_ID) missing.push('STRIPE_TEST_MONTHLY_PRICE_ID')
+      if (!process.env.STRIPE_TEST_YEARLY_PRICE_ID) missing.push('STRIPE_TEST_YEARLY_PRICE_ID')
+    } else {
+      if (!process.env.STRIPE_MONTHLY_PRICE_ID) missing.push('STRIPE_MONTHLY_PRICE_ID')
+      if (!process.env.STRIPE_YEARLY_PRICE_ID) missing.push('STRIPE_YEARLY_PRICE_ID')
+    }
     if (!process.env.SUPABASE_URL) missing.push('SUPABASE_URL')
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) missing.push('SUPABASE_SERVICE_ROLE_KEY')
     if (missing.length > 0) {
@@ -64,10 +71,10 @@ export async function POST(request: NextRequest) {
       customerId = customer.id
     }
 
-    // Get price ID based on plan
+    // Get price ID based on plan (test or live)
     const priceId = validated.plan === 'monthly'
-      ? process.env.STRIPE_MONTHLY_PRICE_ID!
-      : process.env.STRIPE_YEARLY_PRICE_ID!
+      ? (useTestKeys ? process.env.STRIPE_TEST_MONTHLY_PRICE_ID! : process.env.STRIPE_MONTHLY_PRICE_ID!)
+      : (useTestKeys ? process.env.STRIPE_TEST_YEARLY_PRICE_ID! : process.env.STRIPE_YEARLY_PRICE_ID!)
 
     if (!priceId) {
       return serverError('Price ID not configured')

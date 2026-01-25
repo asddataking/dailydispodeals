@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
           // Get subscription details
           const subscription = await stripe.subscriptions.retrieve(session.subscription as string)
           const priceId = subscription.items.data[0]?.price.id
-          const plan = priceId === process.env.STRIPE_MONTHLY_PRICE_ID ? 'monthly' : 'yearly'
+          const plan = (priceId === process.env.STRIPE_TEST_MONTHLY_PRICE_ID || priceId === process.env.STRIPE_MONTHLY_PRICE_ID) ? 'monthly' : 'yearly'
 
           span.setAttribute("plan", plan);
           span.setAttribute("subscription_id", subscription.id);
