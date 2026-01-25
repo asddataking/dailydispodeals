@@ -29,7 +29,8 @@ export function PlanSelectionModal({ open, onOpenChange, initialEmail = '' }: Pl
       })
 
       if (isErrorResponse(response)) {
-        throw new Error(getErrorMessage(response))
+        const msg = getErrorMessage(response) + (response.details ? ` — ${String(response.details)}` : '')
+        throw new Error(msg)
       }
 
       const data = unwrapApiResponse(response)

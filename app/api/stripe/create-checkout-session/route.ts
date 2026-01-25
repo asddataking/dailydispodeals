@@ -31,6 +31,18 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const validated = schema.parse(body)
 
+    // Fail fast with clear messages if required env is missing (Production)
+    const missing: string[] = []
+    if (!process.env.STRIPE_SECRET_KEY) missing.push('STRIPE_SECRET_KEY')
+    if (!process.env.STRIPE_MONTHLY_PRICE_ID) missing.push('STRIPE_MONTHLY_PRICE_ID')
+    if (!process.env.STRIPE_YEARLY_PRICE_ID) missing.push('STRIPE_YEARLY_PRICE_ID')
+    if (!process.env.APP_URL) missing.push('APP_URL')
+    if (!process.env.SUPABASE_URL) missing.push('SUPABASE_URL')
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) missing.push('SUPABASE_SERVICE_ROLE_KEY')
+    if (missing.length > 0) {
+      return serverError('Checkout not configured', `Missing in Vercel: ${missing.join(', ')}`)
+    }
+
     // Create/get Supabase Auth user silently (before Stripe checkout)
     const authUserId = await getOrCreateAuthUser(validated.email)
 
@@ -71,7 +83,6 @@ export async function POST(request: NextRequest) {
       ],
       success_url: `${process.env.APP_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.APP_URL}/?canceled=1`,
-      customer_email: validated.email,
       metadata: {
         auth_user_id: authUserId,
       },
@@ -94,6 +105,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return serverError('Failed to create checkout session')
+    const errMessage = error instanceof Error ? error.message : String(error)
+    return serverError('Failed to create checkout session', errMessage)
   }
 }
