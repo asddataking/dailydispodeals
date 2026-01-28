@@ -110,6 +110,49 @@ export async function GET(request: NextRequest) {
         let failed = 0
         let skipped = 0
 
+        // Pre-fetch all users and preferences for batch processing
+        const emails = [...new Set(pendingNotifications.map(n => n.email))]
+        const { data: users } = await supabaseAdmin
+          .from('users')
+          .select('id, email')
+          .in('email', emails)
+
+        const usersByEmail = new Map((users || []).map(u => [u.email, u]))
+        const userIds = (users || []).map(u => u.id)
+
+        // Fetch all preferences in one query
+        const { data: allPreferences } = await supabaseAdmin
+          .from('preferences')
+          .select('user_id, categories, brands, zip, radius, email_enabled')
+          .in('user_id', userIds)
+
+        const preferencesByUserId = new Map((allPreferences || []).map(p => [p.user_id, p]))
+
+        // Collect all unique brand names from all preferences
+        const allBrandNames = new Set<string>()
+        for (const pref of allPreferences || []) {
+          if (pref.brands && Array.isArray(pref.brands)) {
+            for (const brand of pref.brands) {
+              allBrandNames.add(brand)
+            }
+          }
+        }
+
+        // Batch query all brands at once
+        const brandNameToIdMap = new Map<string, string>()
+        if (allBrandNames.size > 0) {
+          const { data: allBrands } = await supabaseAdmin
+            .from('brands')
+            .select('id, name')
+            .in('name', Array.from(allBrandNames))
+
+          if (allBrands) {
+            for (const brand of allBrands) {
+              brandNameToIdMap.set(brand.name, brand.id)
+            }
+          }
+        }
+
         // Process notifications in batches
         for (let i = 0; i < pendingNotifications.length; i += BATCH_SIZE) {
           const batch = pendingNotifications.slice(i, i + BATCH_SIZE)
@@ -143,14 +186,10 @@ export async function GET(request: NextRequest) {
                 return
               }
 
-              // DEALS_READY: Find user by email
-              const { data: user, error: userError } = await supabaseAdmin
-                .from('users')
-                .select('id')
-                .eq('email', email)
-                .single()
+              // DEALS_READY: Find user by email (use pre-fetched map)
+              const user = usersByEmail.get(email)
 
-              if (userError || !user) {
+              if (!user) {
                 // Mark as failed - user doesn't exist
                 await supabaseAdmin
                   .from('notifications_outbox')
@@ -164,12 +203,8 @@ export async function GET(request: NextRequest) {
                 return
               }
 
-              // Check if user has email enabled
-              const { data: preferences } = await supabaseAdmin
-                .from('preferences')
-                .select('categories, brands, zip, radius, email_enabled')
-                .eq('user_id', user.id)
-                .single()
+              // Check if user has email enabled (use pre-fetched preferences)
+              const preferences = preferencesByUserId.get(user.id)
 
               if (!preferences || preferences.email_enabled === false) {
                 // User unsubscribed or no preferences
@@ -243,17 +278,15 @@ export async function GET(request: NextRequest) {
                 .eq('needs_review', false) // Only show approved deals
                 .limit(10)
 
-              // If user has brand preferences, filter by brands
+              // If user has brand preferences, filter by brands (use pre-fetched brand map)
               if (preferences.brands && preferences.brands.length > 0) {
-                // Get brand IDs for user's preferred brands
-                const { data: brandIds } = await supabaseAdmin
-                  .from('brands')
-                  .select('id')
-                  .in('name', preferences.brands)
+                // Get brand IDs from pre-fetched map
+                const brandIds = preferences.brands
+                  .map(brandName => brandNameToIdMap.get(brandName))
+                  .filter((id): id is string => id !== undefined)
 
-                if (brandIds && brandIds.length > 0) {
-                  const ids = brandIds.map(b => b.id)
-                  dealsQuery = dealsQuery.in('brand_id', ids)
+                if (brandIds.length > 0) {
+                  dealsQuery = dealsQuery.in('brand_id', brandIds)
                 } else {
                   // User has brand preferences but no matching brands found
                   skipped++

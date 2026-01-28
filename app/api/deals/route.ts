@@ -98,6 +98,7 @@ export async function GET(request: NextRequest) {
     const twoDaysAgoStr = twoDaysAgo.toISOString().split('T')[0]
 
     // Query deals matching date and categories, with brand join
+    // Show deals from last 2 days up to and including the requested date
     let query = supabaseAdmin
       .from('deals')
       .select(`
@@ -107,8 +108,8 @@ export async function GET(request: NextRequest) {
           name
         )
       `)
-      .eq('date', date)
       .gte('date', twoDaysAgoStr) // Only show deals from last 2 days
+      .lte('date', date) // Up to and including the requested date
       .in('category', preferences.categories)
       .eq('needs_review', false) // Only show approved deals
       .limit(100) // Prevent unbounded queries

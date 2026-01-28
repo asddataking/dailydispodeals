@@ -18,7 +18,15 @@ export async function GET(request: NextRequest) {
 
   try {
     const brands = await getAllBrands()
-    return NextResponse.json({ brands })
+    // Cache brands for 1 hour (brands don't change frequently)
+    return NextResponse.json(
+      { brands },
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+        },
+      }
+    )
   } catch (error) {
     console.error('Brands API error:', error)
     return NextResponse.json(

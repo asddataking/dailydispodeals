@@ -73,82 +73,87 @@ export async function GET(request: NextRequest) {
         let failed = 0
         let skipped = 0
 
-        for (const user of users) {
-          const p = prefsByUser.get(user.id)
-          if (!p?.zip || p.email_enabled === false) {
-            skipped++
-            continue
-          }
+        // Process users in batches for parallel processing
+        for (let i = 0; i < users.length; i += BATCH_SIZE) {
+          const batch = users.slice(i, i + BATCH_SIZE)
 
-          const { data: existing } = await supabaseAdmin
-            .from('email_logs')
-            .select('id')
-            .eq('user_id', user.id)
-            .eq('date', today)
-            .eq('status', 'sent')
-            .maybeSingle()
+          await Promise.all(batch.map(async (user) => {
+            const p = prefsByUser.get(user.id)
+            if (!p?.zip || p.email_enabled === false) {
+              skipped++
+              return
+            }
 
-          if (existing) {
-            skipped++
-            continue
-          }
+            const { data: existing } = await supabaseAdmin
+              .from('email_logs')
+              .select('id')
+              .eq('user_id', user.id)
+              .eq('date', today)
+              .eq('status', 'sent')
+              .maybeSingle()
 
-          const radius = (p.radius as number) || 25
-          const dispensaries = await getDispensariesNearZip(p.zip, radius)
-          const names = dispensaries.map((d) => d.name)
-          if (names.length === 0) {
-            skipped++
-            continue
-          }
+            if (existing) {
+              skipped++
+              return
+            }
 
-          const { data: deals } = await supabaseAdmin
-            .from('deals')
-            .select(`*, brands ( id, name )`)
-            .gte('date', weekAgo)
-            .lte('date', today)
-            .in('dispensary_name', names)
-            .eq('needs_review', false)
-            .order('date', { ascending: false })
-            .limit(15)
+            const radius = (p.radius as number) || 25
+            const dispensaries = await getDispensariesNearZip(p.zip, radius)
+            const names = dispensaries.map((d) => d.name)
+            if (names.length === 0) {
+              skipped++
+              return
+            }
 
-          const { subject, html } = renderWeeklySummaryEmail(
-            deals || [],
-            user.email,
-            process.env.APP_URL || 'https://dailydispodeals.com',
-            p.zip
-          )
+            const { data: deals } = await supabaseAdmin
+              .from('deals')
+              .select(`*, brands ( id, name )`)
+              .gte('date', weekAgo)
+              .lte('date', today)
+              .in('dispensary_name', names)
+              .eq('needs_review', false)
+              .order('date', { ascending: false })
+              .limit(15)
 
-          try {
-            await resend.emails.send({
-              from: 'Daily Dispo Deals <deals@dailydispodeals.com>',
-              to: user.email,
-              subject,
-              html,
-            })
-            await supabaseAdmin.from('email_logs').insert({
-              user_id: user.id,
-              date: today,
-              status: 'sent',
-            })
-            sent++
-          } catch (emailErr) {
-            const { logger } = Sentry
-            logger.error('Weekly email send failed', {
-              email: user.email,
-              error: emailErr instanceof Error ? emailErr.message : String(emailErr),
-            })
-            Sentry.captureException(emailErr instanceof Error ? emailErr : new Error(String(emailErr)), {
-              tags: { operation: 'cron_send_weekly' },
-              extra: { user_id: user.id, email: user.email },
-            })
-            await supabaseAdmin.from('email_logs').insert({
-              user_id: user.id,
-              date: today,
-              status: 'failed',
-              error: emailErr instanceof Error ? emailErr.message : String(emailErr),
-            })
-            failed++
-          }
+            const { subject, html } = renderWeeklySummaryEmail(
+              deals || [],
+              user.email,
+              process.env.APP_URL || 'https://dailydispodeals.com',
+              p.zip
+            )
+
+            try {
+              await resend.emails.send({
+                from: 'Daily Dispo Deals <deals@dailydispodeals.com>',
+                to: user.email,
+                subject,
+                html,
+              })
+              await supabaseAdmin.from('email_logs').insert({
+                user_id: user.id,
+                date: today,
+                status: 'sent',
+              })
+              sent++
+            } catch (emailErr) {
+              const { logger } = Sentry
+              logger.error('Weekly email send failed', {
+                email: user.email,
+                error: emailErr instanceof Error ? emailErr.message : String(emailErr),
+              })
+              Sentry.captureException(emailErr instanceof Error ? emailErr : new Error(String(emailErr)), {
+                tags: { operation: 'cron_send_weekly' },
+                extra: { user_id: user.id, email: user.email },
+              })
+              await supabaseAdmin.from('email_logs').insert({
+                user_id: user.id,
+                date: today,
+                status: 'failed',
+                error: emailErr instanceof Error ? emailErr.message : String(emailErr),
+              })
+              failed++
+            }
+          }))
         }
 
         span.setAttribute('sent', sent)

@@ -22,11 +22,12 @@ interface DealWithDistance {
 
 /**
  * Get dispensary names that are in the user's subscribed zones
+ * Optimized to use 2 queries instead of 3 sequential queries
  */
 export async function getDispensariesInUserZones(
   email: string
 ): Promise<string[]> {
-  // Get user's zones via user_subscriptions
+  // Query 1: Get user's zone IDs
   const { data: userSubscriptions } = await supabaseAdmin
     .from('user_subscriptions')
     .select('zone_id')
@@ -38,30 +39,32 @@ export async function getDispensariesInUserZones(
 
   const zoneIds = userSubscriptions.map(sub => sub.zone_id)
 
-  // Get dispensary IDs in those zones
-  const { data: zoneDispensaries } = await supabaseAdmin
+  // Query 2: Join zone_dispensaries and dispensaries in one query
+  const { data: zoneDispensariesWithNames } = await supabaseAdmin
     .from('zone_dispensaries')
-    .select('dispensary_id')
+    .select(`
+      dispensary_id,
+      dispensaries!inner(
+        name,
+        active
+      )
+    `)
     .in('zone_id', zoneIds)
 
-  if (!zoneDispensaries || zoneDispensaries.length === 0) {
+  if (!zoneDispensariesWithNames || zoneDispensariesWithNames.length === 0) {
     return []
   }
 
-  const dispensaryIds = zoneDispensaries.map(zd => zd.dispensary_id)
-
-  // Get dispensary names
-  const { data: dispensaries } = await supabaseAdmin
-    .from('dispensaries')
-    .select('name')
-    .in('id', dispensaryIds)
-    .eq('active', true)
-
-  if (!dispensaries || dispensaries.length === 0) {
-    return []
+  // Extract dispensary names (filter for active only)
+  const dispensaryNames = new Set<string>()
+  for (const zd of zoneDispensariesWithNames) {
+    const dispensary = zd.dispensaries as any
+    if (dispensary?.active && dispensary?.name) {
+      dispensaryNames.add(dispensary.name)
+    }
   }
 
-  return dispensaries.map(d => d.name)
+  return Array.from(dispensaryNames)
 }
 
 /**

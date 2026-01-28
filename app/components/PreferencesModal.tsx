@@ -26,6 +26,11 @@ const CATEGORIES = [
   'accessories',
 ] as const
 
+// Module-level cache for brands (similar to YouTube videos pattern)
+let cachedBrands: Array<{ id: string; name: string }> | null = null
+let cachedAt: number | null = null
+const BRANDS_CACHE_TTL_MS = 1000 * 60 * 60 // 1 hour
+
 export function PreferencesModal({
   open,
   onOpenChange,
@@ -58,17 +63,33 @@ export function PreferencesModal({
   // Fetch available brands on mount (only for paid; free does not show brands)
   useEffect(() => {
     if (isFree) return
+    
+    // Check module-level cache first
+    const now = Date.now()
+    if (cachedBrands && cachedAt && now - cachedAt < BRANDS_CACHE_TTL_MS) {
+      setAvailableBrands(cachedBrands)
+      return
+    }
+
     const fetchBrands = async () => {
       try {
         const { callEdgeFunction } = await import('@/lib/supabase/client')
         const data = await callEdgeFunction('get-brands', {})
-        if (data.brands) setAvailableBrands(data.brands)
+        if (data.brands) {
+          cachedBrands = data.brands
+          cachedAt = Date.now()
+          setAvailableBrands(data.brands)
+        }
       } catch (err) {
         console.warn('Edge function failed, using API route:', err)
         fetch('/api/brands')
           .then((res) => res.json())
           .then((data) => {
-            if (data.brands) setAvailableBrands(data.brands)
+            if (data.brands) {
+              cachedBrands = data.brands
+              cachedAt = Date.now()
+              setAvailableBrands(data.brands)
+            }
           })
           .catch(() => {})
       }

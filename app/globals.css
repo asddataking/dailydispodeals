@@ -41,13 +41,13 @@ body {
   }
 }
 
-/* Modal overlay styles */
+/* Modal overlay styles — overlay behind, content on top so it stays interactive */
 .modal-overlay {
-  @apply fixed inset-0 bg-black/50 backdrop-blur-sm z-50;
+  @apply fixed inset-0 bg-black/50 backdrop-blur-sm z-[100];
 }
 
 .modal-content {
-  @apply fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50;
+  @apply fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[101];
   /* Mobile optimization */
   @apply max-h-[90vh] overflow-y-auto;
 }
