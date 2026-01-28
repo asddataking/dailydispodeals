@@ -8,8 +8,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Daily Dispo Deals - Best Cannabis Deals in Michigan | Zero Searching",
-  description: "Get the best daily cannabis deals delivered to your inbox. We scan dispensaries across Michigan and email you personalized deals on flower, vapes, edibles, and more. No searching required.",
+  title: "Daily Dispo Deals — Stop searching. Local dispensary deals, delivered.",
+  description: "Stop searching. Local dispensary deals, delivered.",
   keywords: [
     "cannabis deals",
     "marijuana deals",
@@ -31,8 +31,8 @@ export const metadata: Metadata = {
     "Michigan dispensary deals",
   ],
   openGraph: {
-    title: "Daily Dispo Deals - Best Cannabis Deals in Michigan",
-    description: "Zero searching. Better weed deals. We find the best dispensary deals so you don't have to.",
+    title: "Daily Dispo Deals — Stop searching. Local dispensary deals, delivered.",
+    description: "Stop searching. Local dispensary deals, delivered.",
     type: "website",
     locale: "en_US",
     url: process.env.APP_URL || "https://dailydispodeals.com",
@@ -42,14 +42,14 @@ export const metadata: Metadata = {
         url: "/socialshare.png",
         width: 1200,
         height: 630,
-        alt: "Daily Dispo Deals - Best Cannabis Deals in Michigan",
+        alt: "Daily Dispo Deals — Stop searching. Local dispensary deals, delivered.",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Daily Dispo Deals - Best Cannabis Deals in Michigan",
-    description: "Zero searching. Better weed deals. We find the best dispensary deals so you don't have to.",
+    title: "Daily Dispo Deals — Stop searching. Local dispensary deals, delivered.",
+    description: "Stop searching. Local dispensary deals, delivered.",
     images: ["/socialshare.png"],
   },
   icons: {
