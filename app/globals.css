@@ -43,11 +43,11 @@ body {
 
 /* Modal overlay styles — overlay behind, content on top so it stays interactive */
 .modal-overlay {
-  @apply fixed inset-0 bg-black/50 backdrop-blur-sm z-[100];
+  @apply absolute inset-0 bg-black/50 backdrop-blur-sm z-[100];
 }
 
 .modal-content {
-  @apply fixed left-1/2 z-[101] max-h-[90vh] overflow-y-auto;
+  @apply absolute left-1/2 z-[101] max-h-[90vh] overflow-y-auto;
   /* On small screens, keep the modal slightly below the top so the header and close button are always reachable.
      On larger screens, center it vertically. */
   @apply top-[8vh] -translate-x-1/2 translate-y-0 sm:top-1/2 sm:-translate-y-1/2;

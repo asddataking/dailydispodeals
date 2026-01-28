@@ -68,7 +68,7 @@ export function PlanSelectionModal({ open, onOpenChange, initialEmail = '' }: Pl
 
   if (freeSuccess) {
     return (
-      <Dialog.Root open={open} onOpenChange={onOpenChange}>
+      <Dialog.Root open={open} onOpenChange={onOpenChange} modal={false}>
         <Dialog.Portal>
           <Dialog.Overlay className="modal-overlay" />
           <Dialog.Content
@@ -93,7 +93,7 @@ export function PlanSelectionModal({ open, onOpenChange, initialEmail = '' }: Pl
   }
 
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+    <Dialog.Root open={open} onOpenChange={onOpenChange} modal={false}>
       <Dialog.Portal>
         <AnimatePresence mode="wait">
           {open && (
