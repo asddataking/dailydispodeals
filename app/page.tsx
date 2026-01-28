@@ -413,19 +413,42 @@ export default function Home() {
             <div className="grid md:grid-cols-2 gap-6 sm:gap-8 items-center">
               <div>
                 <div className="text-xs sm:text-sm text-gray-500 mb-2 font-medium">AFFILIATE DEAL</div>
+                <div className="mb-4">
+                  <Image
+                    src="/eterna-logo.png"
+                    alt="Eterna Logo"
+                    width={200}
+                    height={80}
+                    className="h-12 sm:h-16 w-auto object-contain"
+                    priority={false}
+                  />
+                </div>
                 <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-lake-blue-900 mb-4">
-                  20% Off Arizer XQ2 Vaporizers!
+                  Keep Your Cannabis Fresh & Perfect
                 </h2>
                 <p className="text-sm sm:text-base text-gray-700 mb-6">
-                  Use code DANK20 at checkout for 20% off the best dry herb vaporizer.
+                  EternaPacks humidity control packs maintain optimal RH58% to preserve your flower&apos;s freshness, flavor, and potency. Perfect for long-term storage and keeping your stash in peak condition.
                 </p>
-                <button className="bg-lake-blue-700 text-white px-6 py-3 rounded-lg font-semibold hover:bg-lake-blue-800 transition shadow-lg min-h-[48px] w-full sm:w-auto">
-                  Shop Now →
-                </button>
+                <motion.a
+                  href="https://www.eternapacks.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="inline-block bg-lake-blue-700 text-white px-6 py-3 rounded-lg font-semibold hover:bg-lake-blue-800 transition shadow-lg min-h-[48px]"
+                >
+                  Shop EternaPacks →
+                </motion.a>
               </div>
-              <div className="h-48 sm:h-64 bg-gradient-to-br from-lake-blue-100 to-lake-blue-200 rounded-lg flex items-center justify-center">
-                {/* Image placeholder for Vaporizer */}
-                <div className="text-lake-blue-700 text-sm sm:text-base px-4 text-center">Image: Arizer XQ2 Vaporizer</div>
+              <div className="relative h-48 sm:h-64 md:h-80 rounded-lg overflow-hidden bg-gradient-to-br from-pink-50 to-pink-100 flex items-center justify-center">
+                <Image
+                  src="/eterna-product.png"
+                  alt="EternaPacks RH58% humidity control packs"
+                  fill
+                  className="object-contain p-4"
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                  priority={false}
+                />
               </div>
             </div>
           </div>
