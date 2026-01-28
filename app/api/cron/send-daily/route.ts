@@ -281,8 +281,8 @@ export async function GET(request: NextRequest) {
               // If user has brand preferences, filter by brands (use pre-fetched brand map)
               if (preferences.brands && preferences.brands.length > 0) {
                 // Get brand IDs from pre-fetched map
-                const brandIds = preferences.brands
-                  .map(brandName => brandNameToIdMap.get(brandName))
+                const brandIds = (preferences.brands as string[])
+                  .map((brandName: string) => brandNameToIdMap.get(brandName))
                   .filter((id): id is string => id !== undefined)
 
                 if (brandIds.length > 0) {
