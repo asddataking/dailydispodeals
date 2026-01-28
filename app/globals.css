@@ -47,9 +47,10 @@ body {
 }
 
 .modal-content {
-  @apply fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[101];
-  /* Mobile optimization */
-  @apply max-h-[90vh] overflow-y-auto;
+  @apply fixed left-1/2 z-[101] max-h-[90vh] overflow-y-auto;
+  /* On small screens, keep the modal slightly below the top so the header and close button are always reachable.
+     On larger screens, center it vertically. */
+  @apply top-[8vh] -translate-x-1/2 translate-y-0 sm:top-1/2 sm:-translate-y-1/2;
 }
 
 /* Improve touch targets on mobile */

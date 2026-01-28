@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import * as Dialog from '@radix-ui/react-dialog'
 
@@ -19,30 +19,6 @@ export function PlanSelectionModal({ open, onOpenChange, initialEmail = '' }: Pl
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [freeSuccess, setFreeSuccess] = useState(false)
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
-  const dragRef = useRef<{ clientX: number; clientY: number; offsetX: number; offsetY: number } | null>(null)
-
-  const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    if ((e.target as HTMLElement).closest('button')) return
-    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-    dragRef.current = { clientX: e.clientX, clientY: e.clientY, offsetX: dragOffset.x, offsetY: dragOffset.y }
-  }, [dragOffset.x, dragOffset.y])
-
-  const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    if (!dragRef.current) return
-    setDragOffset({
-      x: dragRef.current.offsetX + (e.clientX - dragRef.current.clientX),
-      y: dragRef.current.offsetY + (e.clientY - dragRef.current.clientY),
-    })
-  }, [])
-
-  const handlePointerUp = useCallback(() => {
-    dragRef.current = null
-  }, [])
-
-  useEffect(() => {
-    if (open) setDragOffset({ x: 0, y: 0 })
-  }, [open])
 
   const hasPreFilledEmail = !!(initialEmail && String(initialEmail).trim())
   const emailToSubmit = hasPreFilledEmail ? String(initialEmail).trim() : email
@@ -90,16 +66,6 @@ export function PlanSelectionModal({ open, onOpenChange, initialEmail = '' }: Pl
     }
   }
 
-  const modalTransform = { transform: `translate(calc(-50% + ${dragOffset.x}px), calc(-50% + ${dragOffset.y}px))` }
-  const dragHandleProps = {
-    role: 'presentation' as const,
-    className: 'cursor-grab active:cursor-grabbing touch-none select-none',
-    onPointerDown: handlePointerDown,
-    onPointerMove: handlePointerMove,
-    onPointerUp: handlePointerUp,
-    onPointerCancel: handlePointerUp,
-  }
-
   if (freeSuccess) {
     return (
       <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -107,9 +73,8 @@ export function PlanSelectionModal({ open, onOpenChange, initialEmail = '' }: Pl
           <Dialog.Overlay className="modal-overlay" />
           <Dialog.Content
             className="modal-content modal-draggable bg-white rounded-lg shadow-xl p-4 sm:p-6 md:p-8 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto"
-            style={modalTransform}
           >
-            <div {...dragHandleProps} className={`${dragHandleProps.className} -m-6 mb-4 mt-4 px-6 pt-4 pb-2`}>
+            <div className="-m-6 mb-4 mt-4 px-6 pt-4 pb-2">
               <h2 className="text-xl sm:text-2xl font-bold text-lake-blue-900">You&apos;re all set</h2>
             </div>
             <div className="text-center">
@@ -149,12 +114,8 @@ export function PlanSelectionModal({ open, onOpenChange, initialEmail = '' }: Pl
                   exit={{ opacity: 0, scale: 0.95, y: 20 }}
                   transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                   className="modal-content modal-draggable bg-white rounded-lg shadow-xl p-4 sm:p-6 md:p-8 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto flex flex-col"
-                  style={modalTransform}
                 >
-                  <div
-                    {...dragHandleProps}
-                    className={`${dragHandleProps.className} -mx-4 -mt-4 px-4 pt-4 pb-2 mb-2 pr-14`}
-                  >
+                  <div className="-mx-4 -mt-4 px-4 pt-4 pb-2 mb-2 pr-14">
                     <Dialog.Title className="text-xl sm:text-2xl font-bold text-lake-blue-900">
                       Choose Your Plan
                     </Dialog.Title>
