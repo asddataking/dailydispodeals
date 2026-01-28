@@ -17,7 +17,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json()
-    const { email, categories, brands, zip, radius } = body
+    const { email, categories, brands, zip, radius, preferHighThc, preferValueDeals } = body
 
     // Validate inputs
     if (!email || !email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
@@ -91,6 +91,8 @@ serve(async (req) => {
         brands: brands || [],
         zip: String(zip).trim(),
         radius: Number(radius),
+        prefer_high_thc: !!preferHighThc,
+        prefer_value_deals: !!preferValueDeals,
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'user_id',

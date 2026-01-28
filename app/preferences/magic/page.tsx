@@ -15,6 +15,8 @@ export default function MagicPreferencesPage() {
     radius: 5 | 10 | 25
     categories: string[]
     brands: string[]
+    preferHighThc?: boolean
+    preferValueDeals?: boolean
   } | null>(null)
 
   useEffect(() => {
@@ -45,6 +47,8 @@ export default function MagicPreferencesPage() {
             radius: json.data.radius ?? 10,
             categories: json.data.categories ?? [],
             brands: json.data.brands ?? [],
+            preferHighThc: !!json.data.preferHighThc,
+            preferValueDeals: !!json.data.preferValueDeals,
           })
         }
       } catch {
@@ -89,6 +93,8 @@ export default function MagicPreferencesPage() {
         initialRadius={prefs?.radius ?? 10}
         initialCategories={prefs?.categories ?? []}
         initialBrands={prefs?.brands ?? []}
+        initialPreferHighThc={prefs?.preferHighThc ?? false}
+        initialPreferValueDeals={prefs?.preferValueDeals ?? false}
       />
     </div>
   )

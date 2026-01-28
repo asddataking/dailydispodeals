@@ -20,6 +20,8 @@ const paidSchema = baseSchema.extend({
   brands: z.array(z.string()).optional(),
   zip: z.string().min(1, 'Zip code is required'),
   radius: z.union([z.literal(5), z.literal(10), z.literal(25)]),
+  preferHighThc: z.boolean().optional(),
+  preferValueDeals: z.boolean().optional(),
 })
 const freeSchema = baseSchema.extend({
   zip: z.string().min(1, 'Zip code is required'),
@@ -57,7 +59,7 @@ export async function GET(request: NextRequest) {
 
     const { data: prefs } = await supabaseAdmin
       .from('preferences')
-      .select('zip, radius, categories, brands')
+      .select('zip, radius, categories, brands, prefer_high_thc, prefer_value_deals')
       .eq('user_id', user.id)
       .maybeSingle()
 
@@ -69,6 +71,8 @@ export async function GET(request: NextRequest) {
         radius: (prefs?.radius as 5 | 10 | 25) ?? 10,
         categories: prefs?.categories ?? [],
         brands: (prefs?.brands as string[]) ?? [],
+        preferHighThc: !!prefs?.prefer_high_thc,
+        preferValueDeals: !!prefs?.prefer_value_deals,
       },
     })
   } catch (e) {
@@ -176,6 +180,8 @@ export async function POST(request: NextRequest) {
         brands: validated.brands || [],
         zip: validated.zip || null,
         radius: validated.radius || null,
+        prefer_high_thc: validated.preferHighThc ?? false,
+        prefer_value_deals: validated.preferValueDeals ?? false,
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'user_id',
