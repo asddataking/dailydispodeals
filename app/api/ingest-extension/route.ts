@@ -7,10 +7,17 @@ import { success, validationError, unauthorized, serverError } from '@/lib/api-r
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
+// Canonical origin for the Chrome extension.
+const EXTENSION_ORIGIN = 'chrome-extension://pfpmnidlllbclimlghjhigldcoibpdmd'
+
 const CORS_HEADERS: Record<string, string> = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': EXTENSION_ORIGIN,
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-API-Key',
+  'Access-Control-Allow-Headers':
+    'content-type, x-api-key, x-ddd-install-id, x-ddd-extension-version',
+  'Access-Control-Max-Age': '600',
+  // Ensure caches and intermediaries treat responses as varying by Origin.
+  Vary: 'Origin',
 }
 
 const payloadSchema = z.object({
@@ -51,10 +58,12 @@ function getApiKeyFromRequest(request: NextRequest): string | null {
 }
 
 export async function OPTIONS() {
-  return new NextResponse(null, {
-    status: 204,
-    headers: CORS_HEADERS,
-  })
+  // Explicit preflight response: no auth, no redirects.
+  return withCors(
+    new NextResponse(null, {
+      status: 204,
+    })
+  )
 }
 
 /**
@@ -67,9 +76,10 @@ export async function POST(request: NextRequest) {
   const { logger } = Sentry
 
   try {
-    const configuredKey = process.env.EXTENSION_INGEST_API_KEY
+    const configuredKey =
+      process.env.DDD_EXTENSION_API_KEY || process.env.EXTENSION_INGEST_API_KEY
     if (!configuredKey) {
-      logger.error('EXTENSION_INGEST_API_KEY is not configured')
+      logger.error('Extension ingest API key is not configured')
       return withCors(serverError('Extension ingest is not configured'))
     }
 
