@@ -76,8 +76,7 @@ export async function POST(request: NextRequest) {
   const { logger } = Sentry
 
   try {
-    const configuredKey =
-      process.env.DDD_EXTENSION_API_KEY || process.env.EXTENSION_INGEST_API_KEY
+    const configuredKey = process.env.DDD_EXTENSION_API_KEY
     if (!configuredKey) {
       logger.error('Extension ingest API key is not configured')
       return withCors(serverError('Extension ingest is not configured'))
