@@ -31,7 +31,7 @@ export default async function Home() {
     name: 'Daily Dispo Deals',
     url: process.env.APP_URL || 'https://dailydispodeals.com',
     description:
-      "Today's best dispensary deals. No hunting. Cannabis shoppers browse local specials for free. Dispensaries submit promotions for free.",
+      "Today's best dispo deals. No hunting. Find current Michigan dispensary specials in one place — submitted by shops, free for shoppers.",
     areaServed: { '@type': 'State', name: 'Michigan' },
   }
 

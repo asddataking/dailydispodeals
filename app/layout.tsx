@@ -27,7 +27,7 @@ const marker = Permanent_Marker({
 
 const TITLE = "Daily Dispo Deals — Today's Best Dispo Deals. No Hunting.";
 const DESCRIPTION =
-  "Find today's cannabis deals near you without digging through dispensary menus. Dispensaries submit specials for free. Shoppers browse for free.";
+  "Today's best dispo deals. No hunting. Find current Michigan dispensary specials in one place — submitted by shops, free for shoppers.";
 
 export const metadata: Metadata = {
   title: TITLE,
