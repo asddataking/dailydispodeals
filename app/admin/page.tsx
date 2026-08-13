@@ -8,9 +8,13 @@ import { DealReviewPanel } from '@/app/components/admin/DealReviewPanel'
 import { DispensaryManager } from '@/app/components/admin/DispensaryManager'
 import { LogsViewer } from '@/app/components/admin/LogsViewer'
 import { GeminiChat } from '@/app/components/admin/GeminiChat'
+import { MarketplaceDealsPanel } from '@/app/components/admin/MarketplaceDealsPanel'
+import { AffiliateManager } from '@/app/components/admin/AffiliateManager'
+import { PlacementSettings } from '@/app/components/admin/PlacementSettings'
+import { ClickStats } from '@/app/components/admin/ClickStats'
 import { SkeletonLoader } from '@/app/components/SkeletonLoader'
 
-type Tab = 'overview' | 'deals' | 'dispensaries' | 'logs' | 'chat'
+type Tab = 'overview' | 'deals' | 'listings' | 'affiliates' | 'prices' | 'clicks' | 'dispensaries' | 'logs' | 'chat'
 
 export default function AdminDashboard() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null)
@@ -204,10 +208,14 @@ export default function AdminDashboard() {
       {/* Tabs */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex space-x-8">
+          <nav className="flex space-x-8 overflow-x-auto">
             {[
               { id: 'overview' as Tab, label: 'Overview' },
-              { id: 'deals' as Tab, label: 'Deal Review' },
+              { id: 'listings' as Tab, label: 'Listings' },
+              { id: 'deals' as Tab, label: 'Ingest Review' },
+              { id: 'affiliates' as Tab, label: 'Affiliates' },
+              { id: 'prices' as Tab, label: 'Prices' },
+              { id: 'clicks' as Tab, label: 'Clicks' },
               { id: 'dispensaries' as Tab, label: 'Dispensaries' },
               { id: 'logs' as Tab, label: 'Logs' },
               { id: 'chat' as Tab, label: 'AI Assistant' },
@@ -232,7 +240,11 @@ export default function AdminDashboard() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <ErrorBoundary>
           {activeTab === 'overview' && <StatsDashboard />}
+          {activeTab === 'listings' && <MarketplaceDealsPanel />}
           {activeTab === 'deals' && <DealReviewPanel />}
+          {activeTab === 'affiliates' && <AffiliateManager />}
+          {activeTab === 'prices' && <PlacementSettings />}
+          {activeTab === 'clicks' && <ClickStats />}
           {activeTab === 'dispensaries' && <DispensaryManager />}
           {activeTab === 'logs' && <LogsViewer />}
           {activeTab === 'chat' && <GeminiChat />}

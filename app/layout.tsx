@@ -1,56 +1,67 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Archivo_Black, DM_Sans, Permanent_Marker } from "next/font/google";
 import Script from "next/script";
 import { Analytics } from "@vercel/analytics/react";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { Header } from "./components/site/Header";
+import { Footer } from "./components/site/Footer";
+import { MobileTabBar } from "./components/site/MobileTabBar";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
+const display = Archivo_Black({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-display",
+});
+
+const body = DM_Sans({
+  subsets: ["latin"],
+  variable: "--font-body",
+});
+
+const marker = Permanent_Marker({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-marker",
+});
+
+const TITLE = "Daily Dispo Deals — Today's Best Dispo Deals. No Hunting.";
+const DESCRIPTION =
+  "Find today's cannabis deals near you without digging through dispensary menus. Dispensaries submit specials for free. Shoppers browse for free.";
 
 export const metadata: Metadata = {
-  title: "Daily Dispo Deals — Stop searching. Local dispensary deals, delivered.",
-  description: "Stop searching. Local dispensary deals, delivered.",
+  title: TITLE,
+  description: DESCRIPTION,
   keywords: [
     "cannabis deals",
-    "marijuana deals",
     "dispensary deals",
     "Michigan cannabis",
-    "daily deals",
-    "weed deals",
-    "cannabis discounts",
-    "marijuana sales",
-    "dispensary sales",
-    "cannabis coupons",
-    "best weed deals",
-    "cheap cannabis",
-    "cannabis price comparison",
-    "daily dispo deals",
     "Detroit cannabis deals",
-    "Grand Rapids cannabis deals",
-    "Ann Arbor cannabis deals",
-    "Michigan dispensary deals",
+    "Port Huron dispensary deals",
+    "daily dispo deals",
+    "weed deals Michigan",
   ],
   openGraph: {
-    title: "Daily Dispo Deals — Stop searching. Local dispensary deals, delivered.",
-    description: "Stop searching. Local dispensary deals, delivered.",
+    title: TITLE,
+    description: DESCRIPTION,
     type: "website",
     locale: "en_US",
     url: process.env.APP_URL || "https://dailydispodeals.com",
     siteName: "Daily Dispo Deals",
     images: [
       {
-        url: "/socialshare.png",
+        url: "/hero-city.png",
         width: 1200,
-        height: 630,
-        alt: "Daily Dispo Deals — Stop searching. Local dispensary deals, delivered.",
+        height: 900,
+        alt: "Daily Dispo Deals — Today's best dispensary deals.",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Daily Dispo Deals — Stop searching. Local dispensary deals, delivered.",
-    description: "Stop searching. Local dispensary deals, delivered.",
-    images: ["/socialshare.png"],
+    title: TITLE,
+    description: DESCRIPTION,
+    images: ["/hero-city.png"],
   },
   icons: {
     icon: "/logo.png",
@@ -65,6 +76,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
+  themeColor: "#0A0C0B",
 };
 
 export default function RootLayout({
@@ -74,8 +86,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={inter.className}>
-        {/* Google tag (gtag.js) */}
+      <body className={`${display.variable} ${body.variable} ${marker.variable} font-sans site-grain`}>
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-JFZQ7GTNK9"
           strategy="afterInteractive"
@@ -88,7 +99,6 @@ export default function RootLayout({
             gtag('config', 'G-JFZQ7GTNK9');
           `}
         </Script>
-        {/* Meta Pixel Code */}
         <Script id="meta-pixel" strategy="afterInteractive">
           {`
             !function(f,b,e,v,n,t,s)
@@ -108,13 +118,16 @@ export default function RootLayout({
           <img
             height="1"
             width="1"
-            style={{ display: 'none' }}
+            style={{ display: "none" }}
             src="https://www.facebook.com/tr?id=892171203807837&ev=PageView&noscript=1"
             alt=""
           />
         </noscript>
         <ErrorBoundary>
-          {children}
+          <Header />
+          <main className="min-h-screen bg-ink text-cream">{children}</main>
+          <Footer />
+          <MobileTabBar />
         </ErrorBoundary>
         <Analytics />
       </body>

@@ -1,47 +1,54 @@
 import { MetadataRoute } from 'next'
+import { CURATED_CITIES } from '@/lib/cities'
+import { DEAL_CATEGORIES } from '@/lib/categories'
+import { GEAR_ARTICLES, GEAR_CATEGORIES } from '@/lib/gear'
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = process.env.APP_URL || 'https://dailydispodeals.com'
-  
-  // Main pages
-  const routes = [
-    {
-      url: baseUrl,
-      lastModified: new Date(),
-      changeFrequency: 'daily' as const,
-      priority: 1,
-    },
-    {
-      url: `${baseUrl}/#how-it-works`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly' as const,
-      priority: 0.8,
-    },
-    {
-      url: `${baseUrl}/#pricing`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly' as const,
-      priority: 0.8,
-    },
-  ]
+  const now = new Date()
 
-  // Add location-based pages for SEO (Michigan cities)
-  const michiganCities = [
-    'detroit', 'grand-rapids', 'ann-arbor', 'lansing', 'flint', 'warren',
-    'sterling-heights', 'troy', 'farmington-hills', 'kalamazoo', 'livonia',
-    'dearborn', 'southfield', 'rochester-hills', 'taylor', 'st-clair-shores',
-    'pontiac', 'wyoming', 'westland', 'saginaw', 'muskegon', 'bay-city',
-    'midland', 'holland', 'mount-pleasant', 'battle-creek', 'jackson',
-    'portage', 'east-lansing', 'royal-oak', 'ferndale', 'birmingham',
-    'berkley', 'huntington-woods', 'clawson', 'madison-heights', 'hazel-park'
-  ]
+  const staticRoutes = [
+    '',
+    '/deals',
+    '/michigan',
+    '/dispensaries',
+    '/brands',
+    '/submit',
+    '/for-dispensaries',
+    '/advertise',
+    '/gear',
+    '/about',
+    '/contact',
+    '/terms',
+    '/privacy',
+    '/affiliate-disclosure',
+  ].map((path) => ({
+    url: `${baseUrl}${path || '/'}`,
+    lastModified: now,
+    changeFrequency: 'daily' as const,
+    priority: path === '' ? 1 : 0.8,
+  }))
 
-  const locationPages = michiganCities.map(city => ({
-    url: `${baseUrl}/deals/${city}`,
-    lastModified: new Date(),
+  const cities = CURATED_CITIES.map((c) => ({
+    url: `${baseUrl}/michigan/${c.slug}`,
+    lastModified: now,
+    changeFrequency: 'daily' as const,
+    priority: 0.8,
+  }))
+
+  const categories = DEAL_CATEGORIES.map((c) => ({
+    url: `${baseUrl}/deals/${c.slug}`,
+    lastModified: now,
     changeFrequency: 'daily' as const,
     priority: 0.7,
   }))
 
-  return [...routes, ...locationPages]
+  const gear = [...GEAR_CATEGORIES, ...GEAR_ARTICLES].map((g) => ({
+    url: `${baseUrl}/gear/${g.slug}`,
+    lastModified: now,
+    changeFrequency: 'weekly' as const,
+    priority: 0.6,
+  }))
+
+  return [...staticRoutes, ...cities, ...categories, ...gear]
 }

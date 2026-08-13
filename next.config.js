@@ -1,15 +1,77 @@
 const { withSentryConfig } = require("@sentry/nextjs");
 
+const curatedCities = [
+  'detroit',
+  'ann-arbor',
+  'port-huron',
+  'grand-rapids',
+  'lansing',
+  'flint',
+  'kalamazoo',
+  'royal-oak',
+  'ferndale',
+  'saginaw',
+]
+
+const oldCitySlugs = [
+  'detroit',
+  'grand-rapids',
+  'ann-arbor',
+  'lansing',
+  'flint',
+  'warren',
+  'sterling-heights',
+  'troy',
+  'farmington-hills',
+  'kalamazoo',
+  'livonia',
+  'dearborn',
+  'southfield',
+  'rochester-hills',
+  'taylor',
+  'st-clair-shores',
+  'pontiac',
+  'wyoming',
+  'westland',
+  'saginaw',
+  'muskegon',
+  'bay-city',
+  'midland',
+  'holland',
+  'mount-pleasant',
+  'battle-creek',
+  'jackson',
+  'portage',
+  'east-lansing',
+  'royal-oak',
+  'ferndale',
+  'birmingham',
+  'berkley',
+  'huntington-woods',
+  'clawson',
+  'madison-heights',
+  'hazel-park',
+]
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    domains: [],
+    remotePatterns: [
+      { protocol: 'https', hostname: '*.supabase.co' },
+      { protocol: 'https', hostname: '*.supabase.in' },
+    ],
   },
-  // Ensure API routes are not statically optimized
   experimental: {
     serverActions: {
-      bodySizeLimit: '2mb',
+      bodySizeLimit: '8mb',
     },
+  },
+  async redirects() {
+    return oldCitySlugs.map((slug) => ({
+      source: `/deals/${slug}`,
+      destination: curatedCities.includes(slug) ? `/michigan/${slug}` : '/michigan',
+      permanent: true,
+    }))
   },
 }
 

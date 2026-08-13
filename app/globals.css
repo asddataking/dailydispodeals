@@ -3,65 +3,103 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
+  --foreground: #f4ede1;
+  --background: #0a0c0b;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-  }
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  color: var(--foreground);
+  background: var(--background);
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
-  
-  /* Custom gradient utilities for Michigan lake theme */
+
   .gradient-lake {
     background: linear-gradient(135deg, #0a2540 0%, #136694 100%);
   }
-  
+
   .gradient-lake-light {
     background: linear-gradient(135deg, #0d3a5c 0%, #105078 100%);
   }
 }
 
-/* Modal overlay styles — overlay behind, content on top so it stays interactive */
+.site-grain {
+  position: relative;
+}
+
+.site-grain::before {
+  content: "";
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  opacity: 0.07;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
+}
+
+.halftone {
+  background-image: radial-gradient(rgba(244, 237, 225, 0.08) 0.8px, transparent 0.8px);
+  background-size: 6px 6px;
+}
+
+.sticker {
+  @apply inline-flex items-center border-[2.5px] border-cream bg-mint px-2 py-0.5 text-[11px] font-display uppercase tracking-wide text-ink shadow-sticker rotate-[-2deg];
+}
+
+.sticker-coral {
+  @apply inline-flex items-center border-[2.5px] border-cream bg-coral px-2 py-0.5 text-[11px] font-display uppercase tracking-wide text-ink rotate-[2deg];
+}
+
+.sticker-gold {
+  @apply inline-flex items-center border-[2.5px] border-ink bg-gold px-2 py-0.5 text-[11px] font-display uppercase tracking-wide text-ink rotate-[-1deg];
+}
+
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 border-[3px] border-mint bg-mint px-5 py-3 font-display text-lg uppercase tracking-wide text-ink transition hover:bg-cream hover:border-cream;
+}
+
+.btn-ghost {
+  @apply inline-flex items-center justify-center gap-2 border-[3px] border-cream/40 bg-transparent px-5 py-3 font-display text-lg uppercase tracking-wide text-cream transition hover:border-mint hover:text-mint;
+}
+
+.btn-coral {
+  @apply inline-flex items-center justify-center gap-2 border-[3px] border-coral bg-coral px-5 py-3 font-display text-lg uppercase tracking-wide text-ink transition hover:bg-cream hover:border-cream;
+}
+
+.section-kicker {
+  @apply font-marker text-mint text-xl;
+}
+
+.panel {
+  @apply border-[3px] border-cream/20 bg-ink-2;
+}
+
 .modal-overlay {
   @apply absolute inset-0 bg-black/50 backdrop-blur-sm z-[100];
 }
 
 .modal-content {
   @apply absolute left-1/2 z-[101] max-h-[90vh] overflow-y-auto;
-  /* On small screens, keep the modal slightly below the top so the header and close button are always reachable.
-     On larger screens, center it vertically. */
   @apply top-[8vh] -translate-x-1/2 translate-y-0 sm:top-1/2 sm:-translate-y-1/2;
 }
 
-/* Improve touch targets on mobile */
 @media (max-width: 640px) {
-  button, a, input[type="checkbox"], input[type="radio"] {
+  button,
+  a,
+  input[type="checkbox"],
+  input[type="radio"] {
     min-height: 44px;
-    min-width: 44px;
   }
 }
 
-/* Skeleton loader shimmer animation */
 @keyframes shimmer {
   0% {
     background-position: -200% 0;
@@ -73,4 +111,13 @@ body {
 
 .skeleton-shimmer {
   animation: shimmer 1.5s ease-in-out infinite;
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
 }
